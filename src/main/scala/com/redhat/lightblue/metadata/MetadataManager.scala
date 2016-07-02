@@ -75,6 +75,15 @@ class MetadataManager(val client: LightblueClient) {
         new Entity(json.asInstanceOf[ObjectNode])       
     }
     
+    def getEntity(entityName: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): Entity = {
+
+        getEntityVersion(entityName, entityVersionFilter) match {
+            case Some(v) => getEntity(entityName, v)
+            case None => throw new Exception("Entity does not exist")
+        }
+
+    }
+
     def getEntities(entityNameRegex: Regex, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
                 
         listEntities.filter( _.matches(entityNameRegex.regex)).map { entityName =>
@@ -99,7 +108,8 @@ object MetadataManager {
     val mapper = new ObjectMapper();
     mapper.registerModule(DefaultScalaModule)
     
-    val entityVersionDefault = (l: List[EntityVersion]) => l collectFirst {case v if v.defaultVersion => v}
-    val entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(_.version > _.version) (0))
+    def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst {case v if v.defaultVersion => v}
+    def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(_.version > _.version) (0))
+    def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => Some(new EntityVersion(version, null, null, false))
     
 }
