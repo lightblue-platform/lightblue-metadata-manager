@@ -79,7 +79,7 @@ class MetadataManager(val client: LightblueClient) {
 
         getEntityVersion(entityName, entityVersionFilter) match {
             case Some(v) => getEntity(entityName, v)
-            case None => throw new Exception("Entity does not exist")
+            case None => throw new Exception("Entity version does not exist")
         }
 
     }
@@ -109,7 +109,48 @@ object MetadataManager {
     mapper.registerModule(DefaultScalaModule)
     
     def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst {case v if v.defaultVersion => v}
-    def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(_.version > _.version) (0))
-    def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => Some(new EntityVersion(version, null, null, false))
+    def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(versionCompare(_,_) > 0) (0))
+    def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => l collectFirst {case v if v.version == version => v}
+
+    def versionCompare(v1: EntityVersion, v2:EntityVersion): Int = {
+        versionCompare(v1.version, v2.version)
+    }
+
+    // http://stackoverflow.com/questions/6701948/efficient-way-to-compare-version-strings-in-java
+    def versionCompare(v1: String, v2: String): Int = {
+
+        val v1IsSnapshot = v1.endsWith("-SNAPSHOT")
+        val v2IsSnapshot = v2.endsWith("-SNAPSHOT")
+
+        val vals1 = v1.replace("-SNAPSHOT", "") split("""\.""")
+        val vals2 = v2.replace("-SNAPSHOT", "") split("""\.""")
+
+        var i = 0;
+        // set index to first non-equal ordinal or length of shortest version string
+        while (i < vals1.length && i < vals2.length && vals1(i).equals(vals2(i))) {
+            i+=1
+        }
+
+        // compare first non-equal ordinal number
+        if (i < vals1.length && i < vals2.length) {
+            val diff = Integer.valueOf(vals1(i)).compareTo(Integer.valueOf(vals2(i)));
+            return Integer.signum(diff);
+        }
+
+        // the strings are equal
+        if (vals1.length == vals2.length) {
+            // first one is a snapshot and the other isn't
+            if (v1IsSnapshot && !v2IsSnapshot) {
+                return -1
+            }
+            if (!v1IsSnapshot && v2IsSnapshot) {
+                return 1
+            }
+        }
+
+        // the strings are equal or one string is a substring of the other
+        // e.g. "1.2.3" = "1.2.3" or "1.2.3" < "1.2.3.4"
+        return Integer.signum(vals1.length - vals2.length);
+    }
     
 }
