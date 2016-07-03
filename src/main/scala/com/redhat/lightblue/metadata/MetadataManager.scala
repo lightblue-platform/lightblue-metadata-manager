@@ -84,9 +84,11 @@ class MetadataManager(val client: LightblueClient) {
 
     }
 
-    def getEntities(entityNameRegex: Regex, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
+    def getEntities(entityNamePattern: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
+
+        implicit val pattern = entityNamePattern
                 
-        listEntities.filter( _.matches(entityNameRegex.regex)).map { entityName =>
+        listEntities.filter(entityNameFilter).map { entityName =>
             
             getEntityVersion(entityName, entityVersionFilter) match {
                 case Some(v) => Some(getEntity(entityName, v))
@@ -105,6 +107,8 @@ class MetadataManager(val client: LightblueClient) {
 
 object MetadataManager {
     
+    val logger = LoggerFactory.getLogger(MetadataManager.getClass);
+
     val mapper = new ObjectMapper();
     mapper.registerModule(DefaultScalaModule)
     
@@ -153,4 +157,15 @@ object MetadataManager {
         return Integer.signum(vals1.length - vals2.length);
     }
     
+    def entityNameFilter(entity: String)(implicit pattern: String): Boolean = {
+        if (pattern.startsWith("/") && pattern.endsWith("/")) {
+            // regex
+            val _pattern = pattern.substring(1, pattern.length() - 1)
+            logger.debug(s"""Matching entity $entity against ${_pattern}""")
+            entity.matches(_pattern)
+        } else {
+            // equals
+            entity == pattern
+        }
+    }
 }

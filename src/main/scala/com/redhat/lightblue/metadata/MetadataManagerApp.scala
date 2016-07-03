@@ -105,33 +105,19 @@ object MetadataManagerApp extends App {
             case "pull" => {
 
                 if (!cmd.hasOption("e")) {
-                    throw new MissingArgumentException("-e is required")
+                    throw new MissingArgumentException("-e <entity name> is required")
                 }
 
                 if (!cmd.hasOption("v")) {
-                    throw new MissingArgumentException("-v is required")
+                    throw new MissingArgumentException("-v <entity version> is required")
                 }
 
                 val version = parseVersion(cmd.getOptionValue("v"))
-                val entityName = parseEntity(cmd.getOptionValue("e"))
+                val entity = cmd.getOptionValue("e")
 
-                entityName match {
-                    case entityName:Regex => {
-
-                        manager.getEntities(entityName, version) foreach { entity =>
-                            val fileName = s"""${entity.name}.json"""
-                            logger.info(s"""Saving $fileName...""")
-                            Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
-                        }
-                    }
-                    case entityName:String => {
-                        manager.getEntity(entityName, version) match {
-                            case Some(entity) => {
-                                logger.info(s"""Saving ${entity.name}|${entity.version}...""")
-                                Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
-                            }
-                        }
-                    }
+                manager.getEntities(entity, version) foreach { entity =>
+                    logger.info(s"""Saving ${entity.name}|${entity.version}...""")
+                    Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
                 }
 
             }
@@ -159,14 +145,6 @@ object MetadataManagerApp extends App {
         }
 
         throw new ParseException("Expected an operation: pull, push or list")
-    }
-
-    def parseEntity(entity: String): Any = {
-        if (entity.startsWith("/") && entity.endsWith("/")) {
-            entity.substring(1, entity.length() - 2).r
-        } else {
-            entity
-        }
     }
 
     def parseVersion(version: String): List[EntityVersion] => scala.Option[EntityVersion] = {
