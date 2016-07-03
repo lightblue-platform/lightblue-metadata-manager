@@ -1,19 +1,25 @@
 package com.redhat.lightblue.metadata
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConversions.asScalaIterator
 
-import com.redhat.lightblue.client.LightblueClient
-import com.redhat.lightblue.client.request.metadata.MetadataGetEntityNamesRequest
-import com.fasterxml.jackson.databind.node.ArrayNode
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.redhat.lightblue.client.request.metadata.MetadataGetEntityMetadataRequest
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.redhat.lightblue.metadata.MetadataManager._
-import scala.util.matching.Regex
 import org.slf4j.LoggerFactory
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.core.util.DefaultIndenter
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.redhat.lightblue.client.LightblueClient
+import com.redhat.lightblue.client.request.metadata.MetadataGetEntityMetadataRequest
+import com.redhat.lightblue.client.request.metadata.MetadataGetEntityNamesRequest
+import com.redhat.lightblue.metadata.MetadataManager._
+import java.util.HashMap
+import com.fasterxml.jackson.core.`type`.TypeReference
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class EntityVersion(version: String, changelog: String, status: String, defaultVersion: Boolean)
@@ -33,11 +39,11 @@ class Entity(rootNode: ObjectNode) {
     
     def version: String = schemaJson.get("version").get("value").asText()
     
-    def text: String = mapper.writerWithDefaultPrettyPrinter.writeValueAsString(json)
+    def text: String = mapper.writer(prettyPrinter).writeValueAsString(json)
     
-    def entityInfoText = mapper.writerWithDefaultPrettyPrinter.writeValueAsString(entityInfoJson)
+    def entityInfoText = mapper.writer(prettyPrinter).writeValueAsString(entityInfoJson)
     
-    def schemaText = mapper.writerWithDefaultPrettyPrinter.writeValueAsString(schemaJson)
+    def schemaText = mapper.writer(prettyPrinter).writeValueAsString(schemaJson)
 }
 
 class MetadataManager(val client: LightblueClient) {
@@ -107,11 +113,21 @@ class MetadataManager(val client: LightblueClient) {
 
 object MetadataManager {
     
-    val logger = LoggerFactory.getLogger(MetadataManager.getClass);
+    val logger = LoggerFactory.getLogger(MetadataManager.getClass)
 
-    val mapper = new ObjectMapper();
+    // configure json mapper for scala
+    val mapper = new ObjectMapper() with ScalaObjectMapper
     mapper.registerModule(DefaultScalaModule)
+    // key sorting for maps
+    mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+    // configure json pretty printer
+    val prettyPrinter = new DefaultPrettyPrinter();
+    val indenter = new DefaultIndenter("    ", DefaultIndenter.SYS_LF)
+    prettyPrinter.indentObjectsWith(indenter);
+    prettyPrinter.indentArraysWith(indenter);
     
+    // entity version selectors
     def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst {case v if v.defaultVersion => v}
     def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(versionCompare(_,_) > 0) (0))
     def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => l collectFirst {case v if v.version == version => v}
@@ -120,7 +136,7 @@ object MetadataManager {
         versionCompare(v1.version, v2.version)
     }
 
-    // http://stackoverflow.com/questions/6701948/efficient-way-to-compare-version-strings-in-java
+    // solution from http://stackoverflow.com/questions/6701948/efficient-way-to-compare-version-strings-in-java
     def versionCompare(v1: String, v2: String): Int = {
 
         val v1IsSnapshot = v1.endsWith("-SNAPSHOT")

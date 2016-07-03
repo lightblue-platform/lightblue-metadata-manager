@@ -1,8 +1,14 @@
 package com.redhat.lightblue.metadata
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.redhat.lightblue.metadata.MetadataManager._
-import org.junit.Assert._
+
+import com.fasterxml.jackson.core.`type`.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 class EntityNameFilter {
 
@@ -24,5 +30,7 @@ class EntityNameFilter {
         assertFalse(entityNameFilter("someUser"))
         assertTrue(entityNameFilter("legalEntity"))
     }
+
+
 
 }

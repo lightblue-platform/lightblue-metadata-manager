@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.metadata.MetadataManager._
-import scala.util.matching.Regex
 
 object MetadataManagerApp extends App {
 
@@ -121,6 +120,10 @@ object MetadataManagerApp extends App {
                 }
 
             }
+            case "push" => {
+                // TODO
+            }
+            case other => throw new UnsupportedOperationException(s"""Unknown operation $other""")
         }
 
     } catch {
