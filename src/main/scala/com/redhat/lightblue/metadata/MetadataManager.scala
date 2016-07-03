@@ -64,9 +64,9 @@ class MetadataManager(val client: LightblueClient) {
         
     }
     
-    def getEntity(entityName: String, entityVersion: EntityVersion): Entity = getEntity(entityName, entityVersion.version)
+    private def getEntity(entityName: String, entityVersion: EntityVersion): Entity = getEntity(entityName, entityVersion.version)
 
-    def getEntity(entityName: String, entityVersion: String): Entity = {
+    private def getEntity(entityName: String, entityVersion: String): Entity = {
 
         val getE = new MetadataGetEntityMetadataRequest(entityName, entityVersion)
 
@@ -75,11 +75,11 @@ class MetadataManager(val client: LightblueClient) {
         new Entity(json.asInstanceOf[ObjectNode])       
     }
     
-    def getEntity(entityName: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): Entity = {
+    def getEntity(entityName: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): Option[Entity] = {
 
         getEntityVersion(entityName, entityVersionFilter) match {
-            case Some(v) => getEntity(entityName, v)
-            case None => throw new Exception("Entity version does not exist")
+            case Some(v) => Some(getEntity(entityName, v))
+            case None => None
         }
 
     }

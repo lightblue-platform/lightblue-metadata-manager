@@ -125,10 +125,12 @@ object MetadataManagerApp extends App {
                         }
                     }
                     case entityName:String => {
-                        val entity = manager.getEntity(entityName, version)
-
-                        logger.info(s"""Saving ${entity.name}|${entity.version}...""")
-                        Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
+                        manager.getEntity(entityName, version) match {
+                            case Some(entity) => {
+                                logger.info(s"""Saving ${entity.name}|${entity.version}...""")
+                                Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
+                            }
+                        }
                     }
                 }
 
