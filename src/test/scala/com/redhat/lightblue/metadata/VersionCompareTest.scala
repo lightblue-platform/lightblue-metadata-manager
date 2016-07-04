@@ -4,7 +4,7 @@ import org.junit.Test
 import com.redhat.lightblue.metadata.MetadataManager._
 import org.junit.Assert._
 
-class VersionCompare {
+class VersionCompareTest {
 
     @Test
     def testRelease() {

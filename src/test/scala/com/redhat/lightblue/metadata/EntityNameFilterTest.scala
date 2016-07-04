@@ -10,7 +10,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
-class EntityNameFilter {
+class EntityNameFilterTest {
 
     @Test
     def test {
