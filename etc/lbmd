@@ -1,0 +1,3 @@
+#!/bin/bash
+
+java -jar $(find /usr/share/lightblue-metadata-manager -name lightblue-metadata-manager*jar-with-dependencies.jar) $*
