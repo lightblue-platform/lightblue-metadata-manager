@@ -24,10 +24,7 @@ import com.redhat.lightblue.client.request.metadata.MetadataCreateNewEntityReque
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityMetadataRequest
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityNamesRequest
 import com.redhat.lightblue.client.response.DefaultLightblueMetadataResponse
-import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
-import com.redhat.lightblue.metadata.MetadataManager.mapper
-import com.redhat.lightblue.metadata.MetadataManager.parseJson
-import com.redhat.lightblue.metadata.MetadataManager.toSortedString
+import com.redhat.lightblue.metadata.MetadataManager._
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class EntityVersion(version: String, changelog: String, status: String, defaultVersion: Boolean)
@@ -141,7 +138,10 @@ class MetadataManager(val client: LightblueClient) {
     // Tried google-diff-match-patch and java-diff-utils, but was not able to produce usable results
     // There are solutions using json path (RFC 6902), but this is not very human readable
     def diffEntity(entity: Entity) {
-        val remoteEntity = getEntity(entity.name, entity.version)
+        val remoteEntity = getEntity(entity.name, entityVersionNewest) match {
+            case Some(x) => x
+            case None => throw new Exception(s"""${entity.name} does not exist in this environment""")
+        }
 
         val remoteEntityFileName = s""".${remoteEntity.name}-remote.json"""
 
@@ -149,13 +149,11 @@ class MetadataManager(val client: LightblueClient) {
         Files.write(Paths.get(remoteEntityFileName), remoteEntity.text.getBytes)
 
         // prints diff to stdin using the system command called diff
-        s"""diff -u ${entity.name}.json $remoteEntityFileName""" !
+        s"""diff -u $remoteEntityFileName ${entity.name}.json""" !
     }
 
 
     def putEntity(entity: Entity, scope: MetadataScope.Value) {
-
-        val remoteEntity = getEntity(entity.name, entity.version)
 
         val r = new MetadataCreateNewEntityRequest(entity.name, entity.version)
 

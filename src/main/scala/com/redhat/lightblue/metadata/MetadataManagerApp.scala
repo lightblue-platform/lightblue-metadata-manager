@@ -5,7 +5,7 @@ import java.nio.file.Paths
 
 import org.apache.commons.cli._
 import org.apache.commons.cli.HelpFormatter
-import org.slf4j.LoggerFactory
+import org.slf4j._
 
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.client.http.LightblueHttpClient
@@ -21,7 +21,7 @@ object MetadataManagerApp extends App {
     try {
 
         val lbClientOption = Option.builder("lc")
-            .desc("Configuration file for lightblue-client")
+            .desc("Configuration file for lightblue-client. --env is recommended instead.")
             .longOpt("lightblue-client")
             .hasArg()
             .argName("lightblue-client.properties")
@@ -40,18 +40,10 @@ object MetadataManagerApp extends App {
             .longOpt("help")
             .build();
 
-        val opOption = Option.builder("o")
-            .required(true)
-            .longOpt("operation")
-            .desc("Fetch remote metadata and save it locally in a json file")
-            .hasArg()
-            .argName("list|pull|push")
-            .build();
-
         val entityOption = Option.builder("e")
             .required(false)
             .longOpt("entity")
-            .desc("Entity name")
+            .desc("Entity name. You can use regular expression to match multiple entities by name.")
             .hasArg()
             .argName("entity name or /regex/")
             .build();
@@ -59,7 +51,7 @@ object MetadataManagerApp extends App {
         val versionOption = Option.builder("v")
             .required(false)
             .longOpt("version")
-            .desc("Entity version")
+            .desc("Entity version selector.")
             .hasArg()
             .argName("x.x.x|newest|default")
             .build();
@@ -67,24 +59,42 @@ object MetadataManagerApp extends App {
         val ignoreHooksOption = Option.builder()
             .required(false)
             .longOpt("ignoreHooks")
-            .desc("Don't push hooks")
+            .desc("Don't push hooks.")
+            .build();
+
+        val ignoreIndexesOption = Option.builder()
+            .required(false)
+            .longOpt("ignoreIndexes")
+            .desc("Don't push indexes.")
             .build();
 
         options.addOption(lbClientOption)
         options.addOption(envOption)
         options.addOption(helpOption)
-        options.addOption(opOption)
         options.addOption(entityOption)
         options.addOption(versionOption)
         options.addOption(ignoreHooksOption)
+        options.addOption(ignoreIndexesOption)
+
+        if (args.length == 0) {
+            printUsage(options)
+            System.exit(1)
+        }
+
+        val operation = args(0)
+
+        val optionsArgs = args.slice(1, args.length)
 
         val parser = new DefaultParser()
-        val cmd = parser.parse(options, args)
+        val cmd = parser.parse(options, optionsArgs)
 
         if (cmd.hasOption('h')) {
-            // automatically generate the help statement
             printUsage(options)
             System.exit(0);
+        }
+
+        if (!List("push", "pull", "diff", "list").contains(operation)) {
+            throw new ParseException(s"""Unsupported operation $operation""")
         }
 
         if (cmd.hasOption("lc") && cmd.hasOption("env") || !cmd.hasOption("lc") && !cmd.hasOption("env")) {
@@ -105,7 +115,7 @@ object MetadataManagerApp extends App {
 
         val manager = new MetadataManager(client)
 
-        cmd.getOptionValue("o") match {
+        operation match {
             case "list" => {
                 manager.listEntities.foreach(println(_))
             }
@@ -143,6 +153,10 @@ object MetadataManagerApp extends App {
                     entity = entity.stripHooks
                 }
 
+                if (cmd.hasOption("ignoreIndexes")) {
+                    entity = entity.stripIndexes
+                }
+
                 manager.diffEntity(entity)
             }
             case "push" => {
@@ -162,6 +176,10 @@ object MetadataManagerApp extends App {
                     entity = entity.stripHooks
                 }
 
+                if (cmd.hasOption("ignoreIndexes")) {
+                    entity = entity.stripIndexes
+                }
+
                 manager.putEntity(entity, MetadataScope.BOTH)
 
             }
@@ -172,13 +190,16 @@ object MetadataManagerApp extends App {
         case pe: ParseException => {
             logger.error(pe.getMessage)
             printUsage(options)
-            System.exit(0);
+            System.exit(1);
         }
     }
 
     def printUsage(options: Options) {
         val formatter = new HelpFormatter();
-        formatter.printHelp(120, MetadataManagerApp.getClass.getSimpleName, "", options, null);
+        formatter.printHelp(180, MetadataManagerApp.getClass.getSimpleName+" <operation> <options>",
+                "\nAvailable operations: list, pull, push, diff.\n\nOptions:", options, null)
+
+
     }
 
     def operationArgsIndex(args: Array[String]): Int = {
