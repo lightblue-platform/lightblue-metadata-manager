@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.metadata.MetadataManager._
+import scala.io.Source
 
 object MetadataManagerApp extends App {
 
@@ -63,12 +64,19 @@ object MetadataManagerApp extends App {
             .argName("x.x.x|newest|default")
             .build();
 
+        val ignoreHooksOption = Option.builder()
+            .required(false)
+            .longOpt("ignoreHooks")
+            .desc("Don't push hooks")
+            .build();
+
         options.addOption(lbClientOption)
         options.addOption(envOption)
         options.addOption(helpOption)
         options.addOption(opOption)
         options.addOption(entityOption)
         options.addOption(versionOption)
+        options.addOption(ignoreHooksOption)
 
         val parser = new DefaultParser()
         val cmd = parser.parse(options, args)
@@ -115,13 +123,30 @@ object MetadataManagerApp extends App {
                 val entity = cmd.getOptionValue("e")
 
                 manager.getEntities(entity, version) foreach { entity =>
-                    logger.info(s"""Saving ${entity.name}|${entity.version}...""")
+                    logger.info(s"""Saving ${entity}...""")
                     Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
                 }
 
             }
             case "push" => {
-                // TODO
+                if (!cmd.hasOption("e")) {
+                    throw new MissingArgumentException("-e <entity name> is required")
+                }
+
+                val entityName = cmd.getOptionValue("e")
+
+                val metadata = Source.fromFile(s"""$entityName.json""").mkString
+
+                var entity = new Entity(metadata)
+
+                logger.debug(s"""Loaded $entity from local file""")
+
+                if (cmd.hasOption("ignoreHooks")) {
+                    entity = entity.stripHooks
+                }
+
+                manager.putEntity(entity, MetadataScope.BOTH)
+
             }
             case other => throw new UnsupportedOperationException(s"""Unknown operation $other""")
         }

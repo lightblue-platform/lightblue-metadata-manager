@@ -20,30 +20,53 @@ import com.redhat.lightblue.metadata.MetadataManager._
 import java.util.HashMap
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import com.redhat.lightblue.client.request.metadata.MetadataCreateNewEntityRequest
+import com.redhat.lightblue.client.response.DefaultLightblueMetadataResponse
+import com.redhat.lightblue.client.LightblueException
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class EntityVersion(version: String, changelog: String, status: String, defaultVersion: Boolean)
 
 class Entity(rootNode: ObjectNode) {
-            
+
+    def this(jsonStr: String) = this(parseJson(jsonStr))
+
     rootNode.get("schema").asInstanceOf[ObjectNode].remove("_id")
     rootNode.get("entityInfo").asInstanceOf[ObjectNode].remove("_id")
-    
+
     def json: JsonNode = rootNode
-    
+
     def entityInfoJson: JsonNode = rootNode.get("entityInfo")
-    
+
     def schemaJson: JsonNode = rootNode.get("schema")
-    
+
     def name: String = entityInfoJson.get("name").asText()
-    
+
     def version: String = schemaJson.get("version").get("value").asText()
-    
+
     def text: String = toSortedString(json)
-    
+
     def entityInfoText = toSortedString(entityInfoJson)
-    
+
     def schemaText = toSortedString(schemaJson)
+
+    def stripHooks: Entity = {
+        val copy = rootNode.deepCopy()
+        copy.get("entityInfo").asInstanceOf[ObjectNode].remove("hooks")
+        new Entity(copy)
+    }
+
+    def stripIndexes: Entity = {
+        val copy = rootNode.deepCopy()
+        copy.get("entityInfo").asInstanceOf[ObjectNode].remove("indexes")
+        new Entity(copy)
+    }
+
+    override def toString = s"""$name|$version"""
+}
+
+object MetadataScope extends Enumeration {
+    val SCHEMA, ENTITYINFO, BOTH = Value
 }
 
 class MetadataManager(val client: LightblueClient) {
@@ -59,33 +82,33 @@ class MetadataManager(val client: LightblueClient) {
         json.get("entities").asInstanceOf[ArrayNode].iterator.toList.map { x => x.asText() }.sorted
 
     }
-    
+
     def getEntityVersion(entityName: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): Option[EntityVersion] = {
-        
+
         val getE = new MetadataGetEntityMetadataRequest(entityName, null)
 
         val versionsJson = client.metadata(getE).getJson.asInstanceOf[ArrayNode].iterator().toList
-        
-        entityVersionFilter (versionsJson.map( x => mapper.treeToValue(x, classOf[EntityVersion])))
-        
+
+        entityVersionFilter(versionsJson.map(x => mapper.treeToValue(x, classOf[EntityVersion])))
+
     }
-    
+
     private def getEntity(entityName: String, entityVersion: EntityVersion): Entity = getEntity(entityName, entityVersion.version)
 
     private def getEntity(entityName: String, entityVersion: String): Entity = {
 
         val getE = new MetadataGetEntityMetadataRequest(entityName, entityVersion)
 
-        val json = client.metadata(getE).getJson        
-        
-        new Entity(json.asInstanceOf[ObjectNode])       
+        val json = client.metadata(getE).getJson
+
+        new Entity(json.asInstanceOf[ObjectNode])
     }
-    
+
     def getEntity(entityName: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): Option[Entity] = {
 
         getEntityVersion(entityName, entityVersionFilter) match {
             case Some(v) => Some(getEntity(entityName, v))
-            case None => None
+            case None    => None
         }
 
     }
@@ -93,9 +116,9 @@ class MetadataManager(val client: LightblueClient) {
     def getEntities(entityNamePattern: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
 
         implicit val pattern = entityNamePattern
-                
+
         listEntities.filter(entityNameFilter).map { entityName =>
-            
+
             getEntityVersion(entityName, entityVersionFilter) match {
                 case Some(v) => Some(getEntity(entityName, v))
                 case None => {
@@ -104,15 +127,35 @@ class MetadataManager(val client: LightblueClient) {
                 }
             }
         }
-        .filter(_.isDefined) // remove Nones
-        .map(_.get) // extract values from Somes
-        
+            .filter(_.isDefined) // remove Nones
+            .map(_.get) // extract values from Somes
+
+    }
+
+    def putEntity(entity: Entity, scope: MetadataScope.Value) {
+
+        val r = new MetadataCreateNewEntityRequest(entity.name, entity.version)
+
+        val requestBody = scope match {
+            case MetadataScope.SCHEMA     => entity.schemaText
+            case MetadataScope.ENTITYINFO => entity.entityInfoText
+            case MetadataScope.BOTH       => entity.text
+        }
+
+        r.setBodyJson(requestBody)
+
+        val response = client.metadata(r).asInstanceOf[DefaultLightblueMetadataResponse]
+
+        // TODO: https://github.com/lightblue-platform/lightblue-core/issues/672
+        if (response.getJson != null && response.getJson.get("objectType") != null && response.getJson.get("objectType").asText() == "error") {
+            throw new LightblueException(response.getText)
+        }
     }
 
 }
 
 object MetadataManager {
-    
+
     val logger = LoggerFactory.getLogger(MetadataManager.getClass)
 
     // configure json mapper for scala
@@ -126,13 +169,13 @@ object MetadataManager {
     val indenter = new DefaultIndenter("    ", DefaultIndenter.SYS_LF)
     prettyPrinter.indentObjectsWith(indenter);
     prettyPrinter.indentArraysWith(indenter);
-    
-    // entity version selectors
-    def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst {case v if v.defaultVersion => v}
-    def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(versionCompare(_,_) > 0) (0))
-    def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => l collectFirst {case v if v.version == version => v}
 
-    def versionCompare(v1: EntityVersion, v2:EntityVersion): Int = {
+    // entity version selectors
+    def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst { case v if v.defaultVersion => v }
+    def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(versionCompare(_, _) > 0)(0))
+    def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => l collectFirst { case v if v.version == version => v }
+
+    def versionCompare(v1: EntityVersion, v2: EntityVersion): Int = {
         versionCompare(v1.version, v2.version)
     }
 
@@ -142,13 +185,13 @@ object MetadataManager {
         val v1IsSnapshot = v1.endsWith("-SNAPSHOT")
         val v2IsSnapshot = v2.endsWith("-SNAPSHOT")
 
-        val vals1 = v1.replace("-SNAPSHOT", "") split("""\.""")
-        val vals2 = v2.replace("-SNAPSHOT", "") split("""\.""")
+        val vals1 = v1.replace("-SNAPSHOT", "") split ("""\.""")
+        val vals2 = v2.replace("-SNAPSHOT", "") split ("""\.""")
 
         var i = 0;
         // set index to first non-equal ordinal or length of shortest version string
         while (i < vals1.length && i < vals2.length && vals1(i).equals(vals2(i))) {
-            i+=1
+            i += 1
         }
 
         // compare first non-equal ordinal number
@@ -172,7 +215,7 @@ object MetadataManager {
         // e.g. "1.2.3" = "1.2.3" or "1.2.3" < "1.2.3.4"
         return Integer.signum(vals1.length - vals2.length);
     }
-    
+
     def entityNameFilter(entity: String)(implicit pattern: String): Boolean = {
         if (pattern.startsWith("/") && pattern.endsWith("/")) {
             // regex
@@ -195,5 +238,9 @@ object MetadataManager {
         val map = mapper.readValue[Map[String, Any]](jsonStr)
 
         mapper.writer(prettyPrinter).writeValueAsString(JavaUtil.toJava(map))
+    }
+
+    def parseJson(json: String): ObjectNode = {
+        mapper.readTree(json).asInstanceOf[ObjectNode]
     }
 }

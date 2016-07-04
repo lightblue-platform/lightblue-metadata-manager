@@ -173,7 +173,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.redhat.lightblue.metatada.MetadataManagerApp</mainClass>
+                            <mainClass>com.redhat.lightblue.metadata.MetadataManagerApp</mainClass>
                         </manifest>
                     </archive>
 
