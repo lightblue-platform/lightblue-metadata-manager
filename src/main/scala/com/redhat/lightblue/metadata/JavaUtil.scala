@@ -11,15 +11,27 @@ object JavaUtil {
         import scala.collection.JavaConverters._
         x match {
             case y: scala.collection.MapLike[_, _, _] =>
-                y.map { case (d, v) => toJava(d) -> toJava(v) } asJava
+                y.map { case (d, v) => toJava(d) ->  toJava(sortIfArray(v)) } asJava
             case y: scala.collection.SetLike[_, _] =>
                 y map { item: Any => toJava(item) } asJava
             case y: Iterable[_] =>
-                y.map { item: Any => toJava(item) } asJava
+                y map { item: Any => toJava(item) } asJava
             case y: Iterator[_] =>
                 toJava(y.toIterable)
             case _ =>
                 x
+        }
+    }
+
+    /**
+     * Sorts lists because jackson does do this (is only able to sort keys).
+     * // TODO: this is really ugly - conversion and sorting are mixed up
+     */
+    private def sortIfArray(list: Any): Any = {
+        if (list.isInstanceOf[List[String @unchecked]]) {
+            list.asInstanceOf[List[String]].sorted
+        } else {
+            list
         }
     }
 
