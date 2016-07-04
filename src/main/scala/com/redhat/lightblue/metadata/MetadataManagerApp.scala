@@ -128,6 +128,23 @@ object MetadataManagerApp extends App {
                 }
 
             }
+            case "diff" => {
+                if (!cmd.hasOption("e")) {
+                    throw new MissingArgumentException("-e <entity name> is required")
+                }
+
+                val entityName = cmd.getOptionValue("e")
+
+                val metadata = Source.fromFile(s"""$entityName.json""").mkString
+
+                var entity = new Entity(metadata)
+
+                if (cmd.hasOption("ignoreHooks")) {
+                    entity = entity.stripHooks
+                }
+
+                manager.diffEntity(entity)
+            }
             case "push" => {
                 if (!cmd.hasOption("e")) {
                     throw new MissingArgumentException("-e <entity name> is required")

@@ -1,6 +1,10 @@
 package com.redhat.lightblue.metadata
 
+import java.nio.file.Files
+import java.nio.file.Paths
+
 import scala.collection.JavaConversions.asScalaIterator
+import scala.sys.process.stringToProcess
 
 import org.slf4j.LoggerFactory
 
@@ -13,16 +17,17 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.redhat.lightblue.client.LightblueClient
+import com.redhat.lightblue.client.LightblueException
+import com.redhat.lightblue.client.request.metadata.MetadataCreateNewEntityRequest
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityMetadataRequest
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityNamesRequest
-import com.redhat.lightblue.metadata.MetadataManager._
-import java.util.HashMap
-import com.fasterxml.jackson.core.`type`.TypeReference
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.redhat.lightblue.client.request.metadata.MetadataCreateNewEntityRequest
 import com.redhat.lightblue.client.response.DefaultLightblueMetadataResponse
-import com.redhat.lightblue.client.LightblueException
+import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
+import com.redhat.lightblue.metadata.MetadataManager.mapper
+import com.redhat.lightblue.metadata.MetadataManager.parseJson
+import com.redhat.lightblue.metadata.MetadataManager.toSortedString
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class EntityVersion(version: String, changelog: String, status: String, defaultVersion: Boolean)
@@ -132,7 +137,25 @@ class MetadataManager(val client: LightblueClient) {
 
     }
 
+    // TODO: generate diff in java rather than relay on system diff tool
+    // Tried google-diff-match-patch and java-diff-utils, but was not able to produce usable results
+    // There are solutions using json path (RFC 6902), but this is not very human readable
+    def diffEntity(entity: Entity) {
+        val remoteEntity = getEntity(entity.name, entity.version)
+
+        val remoteEntityFileName = s""".${remoteEntity.name}-remote.json"""
+
+        // save remote metadata locally
+        Files.write(Paths.get(remoteEntityFileName), remoteEntity.text.getBytes)
+
+        // prints diff to stdin using the system command called diff
+        s"""diff -u ${entity.name}.json $remoteEntityFileName""" !
+    }
+
+
     def putEntity(entity: Entity, scope: MetadataScope.Value) {
+
+        val remoteEntity = getEntity(entity.name, entity.version)
 
         val r = new MetadataCreateNewEntityRequest(entity.name, entity.version)
 
@@ -150,6 +173,8 @@ class MetadataManager(val client: LightblueClient) {
         if (response.getJson != null && response.getJson.get("objectType") != null && response.getJson.get("objectType").asText() == "error") {
             throw new LightblueException(response.getText)
         }
+
+        logger.info(s"""Pushed $entity""")
     }
 
 }
