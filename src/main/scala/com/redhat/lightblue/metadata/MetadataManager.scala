@@ -39,11 +39,11 @@ class Entity(rootNode: ObjectNode) {
     
     def version: String = schemaJson.get("version").get("value").asText()
     
-    def text: String = mapper.writer(prettyPrinter).writeValueAsString(json)
+    def text: String = toSortedString(json)
     
-    def entityInfoText = mapper.writer(prettyPrinter).writeValueAsString(entityInfoJson)
+    def entityInfoText = toSortedString(entityInfoJson)
     
-    def schemaText = mapper.writer(prettyPrinter).writeValueAsString(schemaJson)
+    def schemaText = toSortedString(schemaJson)
 }
 
 class MetadataManager(val client: LightblueClient) {
@@ -183,5 +183,17 @@ object MetadataManager {
             // equals
             entity == pattern
         }
+    }
+
+    /**
+     * TODO: I don't see a way to key-sort JsonNode
+     * instead doing following conversions: JsonNode -> String -> Map -> String sorted by keys
+     */
+    def toSortedString(json: JsonNode): String = {
+        val jsonStr = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json)
+
+        val map = mapper.readValue[Map[String, Any]](jsonStr)
+
+        mapper.writer(prettyPrinter).writeValueAsString(JavaUtil.toJava(map))
     }
 }
