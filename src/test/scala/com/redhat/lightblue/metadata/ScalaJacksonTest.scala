@@ -28,9 +28,9 @@ class ScalaJacksonTest {
     "schema" : {
         "age" : 29,
         "array" : [
-            "a",
+            "c",
             "b",
-            "c"
+            "a"
         ],
         "arrayOfObjects" : [
             {
@@ -43,9 +43,9 @@ class ScalaJacksonTest {
         "foo" : {
             "bar" : "a",
             "nestedArray" : [
-                "a",
+                "c",
                 "b",
-                "c"
+                "a"
             ],
             "zoo" : 13
         },

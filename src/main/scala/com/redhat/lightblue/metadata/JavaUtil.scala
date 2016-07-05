@@ -11,7 +11,7 @@ object JavaUtil {
         import scala.collection.JavaConverters._
         x match {
             case y: scala.collection.MapLike[_, _, _] =>
-                y.map { case (d, v) => toJava(d) ->  toJava(sortIfList(v)) } asJava
+                y.map { case (d, v) => toJava(d) ->  toJava(v) } asJava
             case y: scala.collection.SetLike[_, _] =>
                 y map { item: Any => toJava(item) } asJava
             case y: Iterable[_] =>
@@ -22,21 +22,4 @@ object JavaUtil {
                 x
         }
     }
-
-    /**
-     * Sorts lists of strings because jackson does do this (is only able to sort keys).
-     * // TODO: this is really ugly - conversion and sorting are mixed up
-     */
-    private def sortIfList(list: Any): Any = {
-        try {
-            // try to treat as a list of strings
-            list.asInstanceOf[List[String]].sorted
-        } catch {
-            case e: ClassCastException => {
-                list
-            }
-        }
-
-    }
-
 }
