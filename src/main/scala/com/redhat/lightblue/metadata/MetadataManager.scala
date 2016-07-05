@@ -258,8 +258,11 @@ object MetadataManager {
     def toSortedString(json: JsonNode): String = {
         val jsonStr = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json)
 
+        // jackson-module-scala handles conversion from json to scala map well
         val map = mapper.readValue[Map[String, Any]](jsonStr)
 
+        // TODO: however, conversion from scala map to json does not work (does not recognize the map properly)
+        // have to convert scala map to java map first
         mapper.writer(prettyPrinter).writeValueAsString(JavaUtil.toJava(map))
     }
 

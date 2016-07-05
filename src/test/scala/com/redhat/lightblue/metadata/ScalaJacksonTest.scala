@@ -14,34 +14,46 @@ import com.fasterxml.jackson.databind.JsonNode
 
 class ScalaJacksonTest {
 
-    val json = """{"name":"Marek", "age":29, "foo": {"bar": "a", "zoo": 13, "nestedArray": ["c", "b", "a"]}, "array": ["c", "b", "a"]}""";
+    val json = """{"schema": {"_id": "id", "name":"Marek", "age":29, "foo": {"bar": "a", "zoo": 13, "nestedArray": ["c", "b", "a"]}, "array": ["c", "b", "a"], "arrayOfObjects": [{"foo": "bar"}, {"bar":"foo"}]}, "entityInfo": {"_id": "id"}}""";
 
     @Test
     def jsonSort {
-        val mapper = new ObjectMapper() with ScalaObjectMapper
-        mapper.registerModule(DefaultScalaModule)
-        mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+        val e = new Entity(json)
 
-        // jackson-module-scala handles conversion from json to scala map well
-        val map = mapper.readValue[Map[Any, Any]](json)
-
-        // TODO: however, conversion from scala map to json does not work (does not recognize the map properly)
-        // have to convert scala map to java map first
-        val result = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(JavaUtil.toJava(map))
+        println(e.text)
 
         val expected =
 """{
-  "age" : 29,
-  "array" : [ "a", "b", "c" ],
-  "foo" : {
-    "bar" : "a",
-    "nestedArray" : [ "a", "b", "c" ],
-    "zoo" : 13
-  },
-  "name" : "Marek"
+    "entityInfo" : { },
+    "schema" : {
+        "age" : 29,
+        "array" : [
+            "a",
+            "b",
+            "c"
+        ],
+        "arrayOfObjects" : [
+            {
+                "foo" : "bar"
+            },
+            {
+                "bar" : "foo"
+            }
+        ],
+        "foo" : {
+            "bar" : "a",
+            "nestedArray" : [
+                "a",
+                "b",
+                "c"
+            ],
+            "zoo" : 13
+        },
+        "name" : "Marek"
+    }
 }"""
 
-        assertEquals(expected, result)
+        assertEquals(expected, e.text)
 
     }
 }
