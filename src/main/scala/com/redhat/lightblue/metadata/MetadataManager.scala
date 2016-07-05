@@ -136,7 +136,7 @@ class MetadataManager(val client: LightblueClient) {
 
     // TODO: generate diff in java rather than relay on system diff tool
     // Tried google-diff-match-patch and java-diff-utils, but was not able to produce usable results
-    // There are solutions using json path (RFC 6902), but this is not very human readable
+    // There are solutions using json patch (RFC 6902), but this is not very human readable
     def diffEntity(entity: Entity) {
         val remoteEntity = getEntity(entity.name, entityVersionNewest) match {
             case Some(x) => x
@@ -148,7 +148,7 @@ class MetadataManager(val client: LightblueClient) {
         // save remote metadata locally
         Files.write(Paths.get(remoteEntityFileName), remoteEntity.text.getBytes)
 
-        // prints diff to stdin using the system command called diff
+        // prints diff to stdin using the system diff command
         s"""diff -u $remoteEntityFileName ${entity.name}.json""" !
     }
 
