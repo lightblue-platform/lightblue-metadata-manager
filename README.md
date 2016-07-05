@@ -1,8 +1,13 @@
 # lightblue-metadata-manager
-A command line tool to manage Lightblue metadata.
+A command line tool to manage [Lightblue](https://github.com/lightblue-platform/) metadata.
 
-Workflow: Pull metadata from Lightblue, make changes, review diff, push changes back to Lightblue. Yes, it's
-similar to working in git.
+Workflow:
+
+1. Pull metadata from Lightblue,
+2. make changes, review diff,
+3. push changes back to Lightblue.
+
+Yes, it's similar to working in git.
 
 ## Usage:
 ```
@@ -58,6 +63,10 @@ lbmd push --env qa -e user # Update metadata in Lightblue in qa
 lbmd pull --env dev -e "/.*/" -v newest # download all newest versions
 lbmd pull --env dev -e "/^(user|legalEntity).*/" -v newest # download all entities starting with user or legalEntity entity
 ```
+
+## Debug
+
+See /tmp/lightblue-metadata-manager-debug.log. This is where all debug statements are logged, including lightblue-client logs.
 
 ## TODOs
 * Update versions, including dependencies in other entities
