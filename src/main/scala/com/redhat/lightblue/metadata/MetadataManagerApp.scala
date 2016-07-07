@@ -11,6 +11,7 @@ import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.metadata.MetadataManager._
 import scala.io.Source
+import com.redhat.lightblue.metadata.Control._
 
 object MetadataManagerApp extends App {
 
@@ -145,7 +146,10 @@ object MetadataManagerApp extends App {
 
                 val entityName = cmd.getOptionValue("e")
 
-                val metadata = Source.fromFile(s"""$entityName.json""").mkString
+
+                val metadata = using (Source.fromFile(s"""$entityName.json""")) { source =>
+                    source.mkString
+                }
 
                 var entity = new Entity(metadata)
 
@@ -166,7 +170,9 @@ object MetadataManagerApp extends App {
 
                 val entityName = cmd.getOptionValue("e")
 
-                val metadata = Source.fromFile(s"""$entityName.json""").mkString
+                val metadata = using (Source.fromFile(s"""$entityName.json""")) { source =>
+                    source.mkString
+                }
 
                 var entity = new Entity(metadata)
 
