@@ -69,6 +69,12 @@ object MetadataManagerApp extends App {
             .desc("Don't push indexes.")
             .build();
 
+        val accessAnyoneOption = Option.builder()
+            .required(false)
+            .longOpt("accessAnyone")
+            .desc("Set access to anyone. For when you don't want to bother with authorization.")
+            .build();
+
         options.addOption(lbClientOption)
         options.addOption(envOption)
         options.addOption(helpOption)
@@ -76,6 +82,7 @@ object MetadataManagerApp extends App {
         options.addOption(versionOption)
         options.addOption(ignoreHooksOption)
         options.addOption(ignoreIndexesOption)
+        options.addOption(accessAnyoneOption)
 
         if (args.length == 0) {
             printUsage(options)
@@ -161,6 +168,10 @@ object MetadataManagerApp extends App {
                     entity = entity.stripIndexes
                 }
 
+                if (cmd.hasOption("accessAnyone")) {
+                    entity = entity.accessAnyone
+                }
+
                 manager.diffEntity(entity)
             }
             case "push" => {
@@ -184,6 +195,10 @@ object MetadataManagerApp extends App {
 
                 if (cmd.hasOption("ignoreIndexes")) {
                     entity = entity.stripIndexes
+                }
+
+                if (cmd.hasOption("accessAnyone")) {
+                    entity = entity.accessAnyone
                 }
 
                 manager.putEntity(entity, MetadataScope.BOTH)

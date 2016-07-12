@@ -52,17 +52,21 @@ class Entity(rootNode: ObjectNode) {
 
     def schemaText = toSortedString(schemaJson)
 
-    def stripHooks: Entity = {
+    private def updateCopy(updater: (ObjectNode) => Unit): Entity = {
         val copy = rootNode.deepCopy()
-        copy.get("entityInfo").asInstanceOf[ObjectNode].remove("hooks")
-        new Entity(copy)
+        updater(copy)
+        return new Entity(copy)
     }
 
-    def stripIndexes: Entity = {
-        val copy = rootNode.deepCopy()
-        copy.get("entityInfo").asInstanceOf[ObjectNode].remove("indexes")
-        new Entity(copy)
-    }
+    def stripHooks: Entity = updateCopy((node: ObjectNode )=> node.get("entityInfo").asInstanceOf[ObjectNode].remove("hooks"))
+    def stripIndexes: Entity = updateCopy((node: ObjectNode )=> node.get("entityInfo").asInstanceOf[ObjectNode].remove("indexes"))
+
+    def accessAnyone: Entity = updateCopy((node: ObjectNode) => {
+        val accessNode = node.get("schema").get("access").asInstanceOf[ObjectNode]
+        val accessArray = mapper.createArrayNode().add("anyone")
+
+        accessNode.fieldNames().foreach(accessNode.set(_, accessArray))
+    })
 
     override def toString = s"""$name|$version"""
 }
