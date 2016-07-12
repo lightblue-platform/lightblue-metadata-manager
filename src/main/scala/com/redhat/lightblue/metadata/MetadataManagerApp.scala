@@ -63,12 +63,6 @@ object MetadataManagerApp extends App {
             .desc("Don't push hooks.")
             .build();
 
-        val ignoreIndexesOption = Option.builder()
-            .required(false)
-            .longOpt("ignoreIndexes")
-            .desc("Don't push indexes.")
-            .build();
-
         val accessAnyoneOption = Option.builder()
             .required(false)
             .longOpt("accessAnyone")
@@ -81,7 +75,6 @@ object MetadataManagerApp extends App {
         options.addOption(entityOption)
         options.addOption(versionOption)
         options.addOption(ignoreHooksOption)
-        options.addOption(ignoreIndexesOption)
         options.addOption(accessAnyoneOption)
 
         if (args.length == 0) {
@@ -164,10 +157,6 @@ object MetadataManagerApp extends App {
                     entity = entity.stripHooks
                 }
 
-                if (cmd.hasOption("ignoreIndexes")) {
-                    entity = entity.stripIndexes
-                }
-
                 if (cmd.hasOption("accessAnyone")) {
                     entity = entity.accessAnyone
                 }
@@ -191,10 +180,6 @@ object MetadataManagerApp extends App {
 
                 if (cmd.hasOption("ignoreHooks")) {
                     entity = entity.stripHooks
-                }
-
-                if (cmd.hasOption("ignoreIndexes")) {
-                    entity = entity.stripIndexes
                 }
 
                 if (cmd.hasOption("accessAnyone")) {
@@ -221,17 +206,6 @@ object MetadataManagerApp extends App {
                 "\nAvailable operations: list, pull, push, diff.\n\nOptions:", options, null)
 
 
-    }
-
-    def operationArgsIndex(args: Array[String]): Int = {
-
-        for (i: Int <- 1 until args.length) {
-            if (List("pull", "push", "list").contains(args(i))) {
-                return i
-            }
-        }
-
-        throw new ParseException("Expected an operation: pull, push or list")
     }
 
     def parseVersion(version: String): List[EntityVersion] => scala.Option[EntityVersion] = {

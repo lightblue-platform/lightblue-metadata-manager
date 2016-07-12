@@ -147,13 +147,16 @@ class MetadataManager(val client: LightblueClient) {
             case None => throw new Exception(s"""${entity.name} does not exist in this environment""")
         }
 
-        val remoteEntityFileName = s""".${remoteEntity.name}-remote.json"""
-
         // save remote metadata locally
+        val remoteEntityFileName = s""".${remoteEntity.name}-remote.json"""
         Files.write(Paths.get(remoteEntityFileName), remoteEntity.text.getBytes)
 
+        // save local metadata to take --ignore operations into account
+        val localEntityFileName = s""".${remoteEntity.name}-local.json"""
+        Files.write(Paths.get(localEntityFileName), entity.text.getBytes)
+
         // prints diff to stdin using the system diff command
-        s"""diff -u $remoteEntityFileName ${entity.name}.json""" !
+        s"""diff -u $remoteEntityFileName $localEntityFileName""" !
     }
 
 
