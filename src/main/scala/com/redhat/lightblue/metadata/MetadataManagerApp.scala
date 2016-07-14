@@ -37,7 +37,7 @@ object MetadataManagerApp extends App {
 
         val helpOption = Option.builder("h")
             .required(false)
-            .desc("prints usage")
+            .desc("Prints usage.")
             .longOpt("help")
             .build();
 
@@ -77,14 +77,10 @@ object MetadataManagerApp extends App {
             .argName("path")
             .build();
 
+        // options which apply to any operation
         options.addOption(lbClientOption)
         options.addOption(envOption)
         options.addOption(helpOption)
-        options.addOption(entityOption)
-        options.addOption(versionOption)
-        options.addOption(ignoreHooksOption)
-        options.addOption(accessAnyoneOption)
-        options.addOption(pathOption)
 
         if (args.length == 0) {
             printUsage(options)
@@ -92,6 +88,26 @@ object MetadataManagerApp extends App {
         }
 
         val operation = args(0)
+
+        // operation specific options
+        operation match {
+            case "pull" => {
+                 options.addOption(entityOption)
+                 options.addOption(versionOption)
+                 options.addOption(pathOption)
+            }
+            case "push" => {
+                options.addOption(entityOption)
+                options.addOption(ignoreHooksOption)
+                options.addOption(accessAnyoneOption)
+            }
+            case "diff" => {
+                options.addOption(entityOption)
+                options.addOption(ignoreHooksOption)
+                options.addOption(accessAnyoneOption)
+            }
+            case _ => ;
+        }
 
         val optionsArgs = args.slice(1, args.length)
 
@@ -228,7 +244,7 @@ object MetadataManagerApp extends App {
     def printUsage(options: Options) {
         val formatter = new HelpFormatter();
         formatter.printHelp(180, MetadataManagerApp.getClass.getSimpleName+" <operation> <options>",
-                "\nAvailable operations: list, pull, push, diff.\n\nOptions:", options, null)
+                "\nAvailable operations: list, pull, push, diff. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
 
 
     }
