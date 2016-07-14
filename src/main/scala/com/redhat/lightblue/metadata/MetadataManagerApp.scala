@@ -69,6 +69,14 @@ object MetadataManagerApp extends App {
             .desc("Set access to anyone. For when you don't want to bother with authorization.")
             .build();
 
+        val pathOption = Option.builder("p")
+            .required(false)
+            .longOpt("path")
+            .desc("Pull specified path, e.g 'entityInfo.indexes'. Leave local metadata otherwise intact.")
+            .hasArg()
+            .argName("path")
+            .build();
+
         options.addOption(lbClientOption)
         options.addOption(envOption)
         options.addOption(helpOption)
@@ -76,6 +84,7 @@ object MetadataManagerApp extends App {
         options.addOption(versionOption)
         options.addOption(ignoreHooksOption)
         options.addOption(accessAnyoneOption)
+        options.addOption(pathOption)
 
         if (args.length == 0) {
             printUsage(options)
@@ -131,11 +140,27 @@ object MetadataManagerApp extends App {
                 }
 
                 val version = parseVersion(cmd.getOptionValue("v"))
-                val entity = cmd.getOptionValue("e")
+                val entityName = cmd.getOptionValue("e")
 
-                manager.getEntities(entity, version) foreach { entity =>
-                    logger.info(s"""Saving ${entity}...""")
-                    Files.write(Paths.get(s"""${entity.name}.json"""), entity.text.getBytes)
+                manager.getEntities(entityName, version) foreach { remoteEntity =>
+                    if (cmd.hasOption("p")) {
+                        // download metadata path from Lightblue and save it locally
+                        val path = cmd.getOptionValue("p")
+
+                        // TODO: do not require local entity
+                        val localEntity = new Entity(using(Source.fromFile(s"""$entityName.json""")) { source =>
+                            source.mkString
+                        })
+
+                        val updatedLocalEntity = localEntity.replacePath(path, remoteEntity)
+
+                        logger.info(s"""Saving $path to ${updatedLocalEntity.name}.json...""")
+                        Files.write(Paths.get(s"""${updatedLocalEntity.name}.json"""), updatedLocalEntity.text.getBytes)
+                    } else {
+                        // download metadata from Lightblue and save it locally
+                        logger.info(s"""Saving ${remoteEntity}...""")
+                        Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
+                    }
                 }
 
             }

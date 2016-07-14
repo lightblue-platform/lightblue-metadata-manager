@@ -68,6 +68,17 @@ class Entity(rootNode: ObjectNode) {
         accessNode.fieldNames().foreach(accessNode.set(_, accessArray))
     })
 
+    def replacePath(path: String, replaceFrom: Entity): Entity = {
+        logger.debug(s"""Replacing $path""")
+        val copy = rootNode.deepCopy()
+
+        val nodeFromPath = getPath(replaceFrom.json, path)
+        logger.debug(s"""Replacing with $nodeFromPath""")
+
+        putPath(copy, getPath(replaceFrom.json, path), path)
+        new Entity(copy)
+    }
+
     override def toString = s"""$name|$version"""
 }
 
@@ -275,5 +286,37 @@ object MetadataManager {
 
     def parseJson(json: String): ObjectNode = {
         mapper.readTree(json).asInstanceOf[ObjectNode]
+    }
+
+    /**
+     * Where path is something like: 'entityInfo.indexes'
+     */
+    def getPath(node: JsonNode, path: String):JsonNode = {
+
+        if (!path.contains(".")) {
+            return node.get(path)
+        }
+
+        val pathArray = path.split("""\.""")
+
+        val nextField = pathArray(0)
+        val remainingPath = pathArray.drop(1).mkString(".")
+
+        getPath(node.get(nextField), remainingPath)
+    }
+
+    def putPath(node: JsonNode, nodePut: JsonNode, path: String) {
+
+        if (!path.contains(".")) {
+            node.asInstanceOf[ObjectNode].set(path, nodePut)
+            return
+        }
+
+        val pathArray = path.split("""\.""")
+
+        val nextField = pathArray(0)
+        val remainingPath = pathArray.drop(1).mkString(".")
+
+        putPath(node.get(nextField), nodePut, remainingPath)
     }
 }
