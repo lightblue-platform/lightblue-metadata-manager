@@ -65,6 +65,18 @@ object MetadataManagerApp extends App {
             .argName("path")
             .build();
 
+        val entityInfoOnlyOption = Option.builder("eio")
+            .required(false)
+            .longOpt("entityInfoOnly")
+            .desc("Push entityInfo only.")
+            .build();
+
+        val schemaOnlyOption = Option.builder("so")
+            .required(false)
+            .longOpt("schemaOnly")
+            .desc("Push schema only.")
+            .build();
+
         // options which apply to any operation
         options.addOption(lbClientOption)
         options.addOption(envOption)
@@ -86,6 +98,8 @@ object MetadataManagerApp extends App {
             }
             case "push" => {
                 options.addOption(entityOption)
+                options.addOption(entityInfoOnlyOption)
+                options.addOption(schemaOnlyOption)
             }
             case "diff" => {
                 options.addOption(entityOption)
@@ -184,6 +198,10 @@ object MetadataManagerApp extends App {
                     throw new MissingArgumentException("-e <entity name> is required")
                 }
 
+                if (cmd.hasOption("eio") && cmd.hasOption("so")) {
+                    throw new ParseException("You need to provide either --entityInfoOnly or --schemaOnly switches, not both")
+                }
+
                 val entityName = cmd.getOptionValue("e")
 
                 val metadata = using (Source.fromFile(s"""$entityName.json""")) { source =>
@@ -194,7 +212,13 @@ object MetadataManagerApp extends App {
 
                 logger.debug(s"""Loaded $entity from local file""")
 
-                manager.putEntity(entity, MetadataScope.BOTH)
+                if (cmd.hasOption("eio")) {
+                    manager.putEntity(entity, MetadataScope.ENTITYINFO)
+                } else if (cmd.hasOption("so")) {
+                    manager.putEntity(entity, MetadataScope.SCHEMA)
+                } else {
+                    manager.putEntity(entity, MetadataScope.BOTH)
+                }
 
             }
             case other => throw new UnsupportedOperationException(s"""Unknown operation $other""")

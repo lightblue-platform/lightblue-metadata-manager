@@ -25,6 +25,7 @@ import com.redhat.lightblue.client.request.metadata.MetadataGetEntityMetadataReq
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityNamesRequest
 import com.redhat.lightblue.client.response.DefaultLightblueMetadataResponse
 import com.redhat.lightblue.metadata.MetadataManager._
+import com.redhat.lightblue.client.request.metadata.MetadataCreateSchemaRequest
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class EntityVersion(version: String, changelog: String, status: String, defaultVersion: Boolean)
@@ -166,16 +167,25 @@ class MetadataManager(val client: LightblueClient) {
 
 
     def putEntity(entity: Entity, scope: MetadataScope.Value) {
+        logger.debug(s"""Uploading $entity scope=$scope""")
 
-        val r = new MetadataCreateNewEntityRequest(entity.name, entity.version)
-
-        val requestBody = scope match {
-            case MetadataScope.SCHEMA     => entity.schemaText
-            case MetadataScope.ENTITYINFO => entity.entityInfoText
-            case MetadataScope.BOTH       => entity.text
+        val r = scope match {
+            case MetadataScope.SCHEMA => {
+                val r = new MetadataCreateSchemaRequest(entity.name, entity.version)
+                r.setBodyJson(entity.schemaText)
+                r
+            }
+            case MetadataScope.ENTITYINFO => {
+                val r = new MetadataCreateNewEntityRequest(entity.name, null)
+                r.setBodyJson(entity.entityInfoText)
+                r
+            }
+            case MetadataScope.BOTH => {
+                val r = new MetadataCreateNewEntityRequest(entity.name, entity.version)
+                r.setBodyJson(entity.text)
+                r
+            }
         }
-
-        r.setBodyJson(requestBody)
 
         val response = client.metadata(r).asInstanceOf[DefaultLightblueMetadataResponse]
 
