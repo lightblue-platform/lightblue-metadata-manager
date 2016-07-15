@@ -13,17 +13,12 @@ Yes, it's similar to working in git.
 ```
 usage: MetadataManagerApp$ <operation> <options>
 
-Available operations: list, pull, push, diff.
+Available operations: list, pull, push, diff. Add -h after operation to see options it accepts.
 
 Options:
- -e,--entity <entity name or /regex/>                   Entity name. You can use regular expression to match multiple entities by name.
     --env <environment, e.g. dev>                       Lightblue environment (export LB_CLIENT_{ENV}=/home/user/lightblue-clients/lightblue-client-{ENV}.properties
- -h,--help                                              prints usage
-    --ignoreHooks                                       Don't push hooks.
-    --ignoreIndexes                                     Don't push indexes.
+ -h,--help                                              Prints usage.
  -lc,--lightblue-client <lightblue-client.properties>   Configuration file for lightblue-client. --env is recommended instead.
- -v,--version <x.x.x|newest|default>                    Entity version selector.
-
 ```
 
 ## Installation
@@ -48,8 +43,13 @@ Should print a list of all entities.
 
 ## Examples
 
-### Make changes in metadata
+### Download multiple entities
+```
+lbmd pull --env dev -e "/.*/" -v newest # download all newest versions
+lbmd pull --env dev -e "/^(user|legalEntity).*/" -v newest # download all entities starting with user or legalEntity entity
+```
 
+### Make changes in metadata
 ```
 lbmd pull --env dev -e user -v newest # saves newest user.json version in your current directory
 vim user.json # make changes in user metadata
@@ -58,17 +58,21 @@ lbmd push --env dev -e user # Update metadata in Lightblue in dev
 lbmd push --env qa -e user # Update metadata in Lightblue in qa
 ```
 
-### Download multiple entities
+### Upload only schema
 ```
-lbmd pull --env dev -e "/.*/" -v newest # download all newest versions
-lbmd pull --env dev -e "/^(user|legalEntity).*/" -v newest # download all entities starting with user or legalEntity entity
+lbmd push --env qa -e user --schemaOnly
+```
+
+### Merge metadata
+
+Say you want to promote metadata from stage to prod, including entityInfo, but you want to make sure you don't change any indexes in prod.
+```
+lbmd pull --env stage -e user -v newest # saves newest user.json version in stage in your current directory
+lbmd pull --env prod -e user -v newest --path entityInfo.indexes # Merge entityInfo.indexes from prod into your local copy
+lbmd diff --env prod -e user # diff your local copy against prod to see what will get pushed
+lbmd push --env prod -e user # update metadata in prod
 ```
 
 ## Debug
 
 See /tmp/lightblue-metadata-manager-debug.log. This is where all debug statements are logged, including lightblue-client logs.
-
-## TODOs
-* Update versions, including dependencies in other entities
-* Push only entityInfo or only schema
-* Push in bulk
