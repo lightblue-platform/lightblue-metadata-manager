@@ -20,8 +20,6 @@ class ScalaJacksonTest {
     def jsonSort {
         val e = new Entity(json)
 
-        println(e.text)
-
         val expected =
 """{
     "entityInfo" : { },

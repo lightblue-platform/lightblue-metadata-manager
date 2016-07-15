@@ -147,7 +147,6 @@ object MetadataManagerApp extends App {
                         // download metadata path from Lightblue and save it locally
                         val path = cmd.getOptionValue("p")
 
-                        // TODO: do not require local entity
                         val localEntity = new Entity(using(Source.fromFile(s"""$entityName.json""")) { source =>
                             source.mkString
                         })
