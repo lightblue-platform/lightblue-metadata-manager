@@ -1,0 +1,96 @@
+{
+    "entityInfo": {
+        "datastore": {
+            "backend": "mongo",
+            "collection": "user",
+            "datasource": "mongodata"
+        },
+        "name": "user"
+    },
+    "schema": {
+        "access": {
+            "delete": [
+                "anyone"
+            ],
+            "find": [
+                "anyone"
+            ],
+            "insert": [
+                "anyone"
+            ],
+            "update": [
+                "anyone"
+            ]
+        },
+        "fields": {
+            "_id": {
+                "constraints": {
+                    "identity": 1
+                },
+                "type": "string"
+            },
+            "active": {
+                "type": "boolean"
+            },
+            "login": {
+                "constraints": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "required": true
+                },
+                "type": "string"
+            },
+            "password": {
+                "fields": {
+                    "hashed": {
+                        "type": "string"
+                    },
+                    "salt": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "personalInfo": {
+                "fields": {
+                    "company": {
+                        "type": "string"
+                    },
+                    "department": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "emailConfirmed": {
+                        "type": "boolean"
+                    },
+                    "faxNumber": {
+                        "type": "string"
+                    },
+                    "firstName": {
+                        "type": "string"
+                    },
+                    "greeting": {
+                        "type": "string"
+                    },
+                    "lastName": {
+                        "type": "string"
+                    },
+                    "locale": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+        },
+        "name": "user",
+        "status": {
+            "value": "active"
+        },
+        "version": {
+            "changelog": "UID Test version",
+            "value": "5.0.0"
+        }
+    }
+}

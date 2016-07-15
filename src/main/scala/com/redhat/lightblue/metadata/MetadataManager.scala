@@ -23,13 +23,20 @@ import com.redhat.lightblue.client.LightblueException
 import com.redhat.lightblue.client.request.metadata.MetadataCreateNewEntityRequest
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityMetadataRequest
 import com.redhat.lightblue.client.request.metadata.MetadataGetEntityNamesRequest
-import com.redhat.lightblue.client.response.DefaultLightblueMetadataResponse
+import com.redhat.lightblue.client.response.LightblueMetadataResponse
 import com.redhat.lightblue.metadata.MetadataManager._
 import com.redhat.lightblue.client.request.metadata.MetadataCreateSchemaRequest
 
+/*
+ * Represents entity versions, as returned by /rest/metadata/{entity}/
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class EntityVersion(version: String, changelog: String, status: String, defaultVersion: Boolean)
 
+/**
+ * Represents entity metadata.
+ *
+ */
 class Entity(rootNode: ObjectNode) {
 
     def this(jsonStr: String) = this(parseJson(jsonStr))
@@ -53,6 +60,7 @@ class Entity(rootNode: ObjectNode) {
 
     def schemaText = toSortedString(schemaJson)
 
+    // set all arrays in entityInfo.access to ["anyone"]
     def accessAnyone: Entity = {
         val copy = rootNode.deepCopy()
         val accessNode = copy.get("schema").get("access").asInstanceOf[ObjectNode]
@@ -63,6 +71,7 @@ class Entity(rootNode: ObjectNode) {
         new Entity(copy)
     }
 
+    // replace node specified by path with the same node from another entity
     def replacePath(path: String, replaceFrom: Entity): Entity = {
         logger.debug(s"""Replacing $path""")
         val copy = rootNode.deepCopy()
@@ -81,6 +90,10 @@ object MetadataScope extends Enumeration {
     val SCHEMA, ENTITYINFO, BOTH = Value
 }
 
+/**
+ * Metadata manipulation logic. Talks to Lightblue using lightblue-client.
+ *
+ */
 class MetadataManager(val client: LightblueClient) {
 
     val logger = LoggerFactory.getLogger(MetadataManager.getClass);
@@ -111,7 +124,11 @@ class MetadataManager(val client: LightblueClient) {
 
         val getE = new MetadataGetEntityMetadataRequest(entityName, entityVersion)
 
-        val json = client.metadata(getE).getJson
+        val response = client.metadata(getE)
+
+        verifyResponse(response)
+
+        val json = response.getJson
 
         new Entity(json.asInstanceOf[ObjectNode])
     }
@@ -187,18 +204,26 @@ class MetadataManager(val client: LightblueClient) {
             }
         }
 
-        val response = client.metadata(r).asInstanceOf[DefaultLightblueMetadataResponse]
+        val response = client.metadata(r)
 
-        // TODO: https://github.com/lightblue-platform/lightblue-core/issues/672
-        if (response.getJson != null && response.getJson.get("objectType") != null && response.getJson.get("objectType").asText() == "error") {
-            throw new LightblueException(response.getText)
-        }
+        verifyResponse(response)
 
         logger.info(s"""Pushed $entity""")
     }
 
+    private def verifyResponse(response: LightblueMetadataResponse) {
+        // TODO: https://github.com/lightblue-platform/lightblue-core/issues/672
+        if (response.getJson != null && response.getJson.get("objectType") != null && response.getJson.get("objectType").asText() == "error") {
+            throw new LightblueException(response.getText)
+        }
+    }
+
 }
 
+/**
+ * MetadataManager's companion object. Provides utility methods.
+ *
+ */
 object MetadataManager {
 
     val logger = LoggerFactory.getLogger(MetadataManager.getClass)
