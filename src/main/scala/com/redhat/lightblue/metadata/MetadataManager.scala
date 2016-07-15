@@ -52,21 +52,15 @@ class Entity(rootNode: ObjectNode) {
 
     def schemaText = toSortedString(schemaJson)
 
-    private def updateCopy(updater: (ObjectNode) => Unit): Entity = {
+    def accessAnyone: Entity = {
         val copy = rootNode.deepCopy()
-        updater(copy)
-        return new Entity(copy)
-    }
-
-    def stripHooks: Entity = updateCopy((node: ObjectNode )=> node.get("entityInfo").asInstanceOf[ObjectNode].remove("hooks"))
-    def stripIndexes: Entity = updateCopy((node: ObjectNode )=> node.get("entityInfo").asInstanceOf[ObjectNode].remove("indexes"))
-
-    def accessAnyone: Entity = updateCopy((node: ObjectNode) => {
-        val accessNode = node.get("schema").get("access").asInstanceOf[ObjectNode]
+        val accessNode = copy.get("schema").get("access").asInstanceOf[ObjectNode]
         val accessArray = mapper.createArrayNode().add("anyone")
 
         accessNode.fieldNames().foreach(accessNode.set(_, accessArray))
-    })
+
+        new Entity(copy)
+    }
 
     def replacePath(path: String, replaceFrom: Entity): Entity = {
         logger.debug(s"""Replacing $path""")

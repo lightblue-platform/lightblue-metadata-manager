@@ -57,18 +57,6 @@ object MetadataManagerApp extends App {
             .argName("x.x.x|newest|default")
             .build();
 
-        val ignoreHooksOption = Option.builder()
-            .required(false)
-            .longOpt("ignoreHooks")
-            .desc("Don't push hooks.")
-            .build();
-
-        val accessAnyoneOption = Option.builder()
-            .required(false)
-            .longOpt("accessAnyone")
-            .desc("Set access to anyone. For when you don't want to bother with authorization.")
-            .build();
-
         val pathOption = Option.builder("p")
             .required(false)
             .longOpt("path")
@@ -98,13 +86,9 @@ object MetadataManagerApp extends App {
             }
             case "push" => {
                 options.addOption(entityOption)
-                options.addOption(ignoreHooksOption)
-                options.addOption(accessAnyoneOption)
             }
             case "diff" => {
                 options.addOption(entityOption)
-                options.addOption(ignoreHooksOption)
-                options.addOption(accessAnyoneOption)
             }
             case _ => ;
         }
@@ -194,14 +178,6 @@ object MetadataManagerApp extends App {
 
                 var entity = new Entity(metadata)
 
-                if (cmd.hasOption("ignoreHooks")) {
-                    entity = entity.stripHooks
-                }
-
-                if (cmd.hasOption("accessAnyone")) {
-                    entity = entity.accessAnyone
-                }
-
                 manager.diffEntity(entity)
             }
             case "push" => {
@@ -218,14 +194,6 @@ object MetadataManagerApp extends App {
                 var entity = new Entity(metadata)
 
                 logger.debug(s"""Loaded $entity from local file""")
-
-                if (cmd.hasOption("ignoreHooks")) {
-                    entity = entity.stripHooks
-                }
-
-                if (cmd.hasOption("accessAnyone")) {
-                    entity = entity.accessAnyone
-                }
 
                 manager.putEntity(entity, MetadataScope.BOTH)
 
