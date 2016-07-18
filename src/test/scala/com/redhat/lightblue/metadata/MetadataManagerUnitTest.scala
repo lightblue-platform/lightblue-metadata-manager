@@ -1,16 +1,19 @@
 package com.redhat.lightblue.metadata
 
 import org.scalatest.FlatSpec
+import org.scalatest.Matchers
 
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
-import org.scalatest.Matchers
 import com.redhat.lightblue.metadata.MetadataManager._
+import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
 /**
  * Unit tests in ScalaTest using FlatSpec style.
  */
-class MetadataManagerUnitTests extends FlatSpec with Matchers {
+@RunWith(classOf[JUnitRunner])
+class MetadataManagerUnitTest extends FlatSpec with Matchers {
 
     "/^user.*/ entity name filter" should "match only entities starting with user" in {
         implicit val pattern = "/^user.*/"

@@ -8,7 +8,7 @@ import com.redhat.lightblue.client.LightblueClient
 import org.junit.Before
 import org.junit.Test
 
-import MetadataManagerIntegrationTests._
+import MetadataManagerIntegrationTest._
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import org.junit.Assert
@@ -17,9 +17,11 @@ import java.io.ByteArrayOutputStream
 import org.junit.After
 import org.apache.commons.io.FileUtils
 import java.io.File
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
 
-object MetadataManagerIntegrationTests {
+object MetadataManagerIntegrationTest {
 
     var lightblue:LightblueExternalResource = _
 
@@ -42,7 +44,7 @@ object MetadataManagerIntegrationTests {
  * JUnit integration test using lightblue-client-integration-test.
  *
  */
-class MetadataManagerIntegrationTests {
+class MetadataManagerIntegrationTest {
 
     var client: LightblueClient = _
 
