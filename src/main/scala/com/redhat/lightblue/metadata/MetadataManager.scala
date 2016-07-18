@@ -90,6 +90,10 @@ object MetadataScope extends Enumeration {
     val SCHEMA, ENTITYINFO, BOTH = Value
 }
 
+class MetadataManagerException(message: String, t: Throwable) extends Exception {
+    def this(message: String) = this(message, null)
+}
+
 /**
  * Metadata manipulation logic. Talks to Lightblue using lightblue-client.
  *
@@ -331,7 +335,10 @@ object MetadataManager {
         val nextField = pathArray(0)
         val remainingPath = pathArray.drop(1).mkString(".")
 
-        getPath(node.get(nextField), remainingPath)
+        node.has(nextField) match {
+            case true => getPath(node.get(nextField), remainingPath)
+            case false => throw new MetadataManagerException(s"""nextField not found!""")
+        }
     }
 
     def putPath(node: JsonNode, nodePut: JsonNode, path: String) {
@@ -346,6 +353,10 @@ object MetadataManager {
         val nextField = pathArray(0)
         val remainingPath = pathArray.drop(1).mkString(".")
 
-        putPath(node.get(nextField), nodePut, remainingPath)
+        node.has(nextField) match {
+            case true => putPath(node.get(nextField), nodePut, remainingPath)
+            case false => throw new MetadataManagerException(s"""nextField not found!""")
+        }
     }
+
 }

@@ -18,6 +18,7 @@ import org.junit.After
 import org.apache.commons.io.FileUtils
 import java.io.File
 
+
 object MetadataManagerIntegrationTests {
 
     var lightblue:LightblueExternalResource = _
@@ -37,6 +38,10 @@ object MetadataManagerIntegrationTests {
     }
 }
 
+/**
+ * JUnit integration test using lightblue-client-integration-test.
+ *
+ */
 class MetadataManagerIntegrationTests {
 
     var client: LightblueClient = _

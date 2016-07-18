@@ -52,6 +52,17 @@
 			<version>5.1.0</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.scalactic</groupId>
+			<artifactId>scalactic_2.11</artifactId>
+			<version>2.2.6</version>
+		</dependency>
+		<dependency>
+			<groupId>org.scalatest</groupId>
+			<artifactId>scalatest_2.11</artifactId>
+			<version>2.2.6</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
