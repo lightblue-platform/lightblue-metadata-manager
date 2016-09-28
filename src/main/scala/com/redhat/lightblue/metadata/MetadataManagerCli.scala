@@ -134,17 +134,17 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             throw new ParseException("Either -lc or --env is required");
         }
 
-        val lbClientFilePath = if (cmd.hasOption("lc")) cmd.getOptionValue("lc") else {
-
-            val envVarName = "LB_CLIENT_" + cmd.getOptionValue("env").toUpperCase()
-            System.getenv(envVarName) match {
-                case null => throw new ParseException(s"""${envVarName} is not set!""")
-                case x    => x
-            }
-        }
-
         val client = _client match {
             case None => {
+
+                val lbClientFilePath = if (cmd.hasOption("lc")) cmd.getOptionValue("lc") else {
+                    val envVarName = "LB_CLIENT_" + cmd.getOptionValue("env").toUpperCase()
+                    System.getenv(envVarName) match {
+                        case null => throw new ParseException(s"""${envVarName} is not set!""")
+                        case x    => x
+                    }
+                }
+
                 logger.debug(s"""Reading lightblue client configuration from ${lbClientFilePath}""")
                 new LightblueHttpClient(lbClientFilePath);
             }
