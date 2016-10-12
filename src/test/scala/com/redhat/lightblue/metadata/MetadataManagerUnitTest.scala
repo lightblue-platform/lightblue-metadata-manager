@@ -33,6 +33,16 @@ class MetadataManagerUnitTest extends FlatSpec with Matchers {
         entityNameFilter("legalEntity") should be (true)
     }
 
+    "$all/ entity name filter" should "match all entities" in {
+
+        implicit val pattern = "$all"
+
+        entityNameFilter("user") should be (true)
+        entityNameFilter("userCredential") should be (true)
+        entityNameFilter("someUser") should be (true)
+        entityNameFilter("legalEntity") should be (true)
+    }
+
     "versionCompare" should "compare X.X.X versions correctly" in {
         versionCompare("1.2.3", "1.2.4") should be < 0
         versionCompare("1.2.3", "1.3.3") should be < 0
