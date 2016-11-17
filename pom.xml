@@ -116,6 +116,7 @@
 			<plugin>
 				<artifactId>maven-eclipse-plugin</artifactId>
 				<configuration>
+					<useProjectReferences>false</useProjectReferences>
 					<sourceIncludes>
 						<sourceInclude>**/*.scala</sourceInclude>
 						<sourceInclude>**/*.java</sourceInclude>
