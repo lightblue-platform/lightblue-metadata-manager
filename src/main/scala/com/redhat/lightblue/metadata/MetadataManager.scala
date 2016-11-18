@@ -104,7 +104,7 @@ class MetadataManager(val client: LightblueClient) {
 
     val logger = LoggerFactory.getLogger(MetadataManager.getClass);
 
-    def listEntities: List[String] = {
+    def listEntities(): List[String] = {
 
         val r = new MetadataGetEntityNamesRequest()
 
@@ -148,11 +148,9 @@ class MetadataManager(val client: LightblueClient) {
 
     }
 
-    def getEntities(entityNamePattern: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
+    def getEntities(entityNamesList: List[String], entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
 
-        implicit val pattern = entityNamePattern
-
-        listEntities.filter(entityNameFilter).map { entityName =>
+        entityNamesList.map { entityName =>
 
             getEntityVersion(entityName, entityVersionFilter) match {
                 case Some(v) => Some(getEntity(entityName, v))
@@ -164,6 +162,14 @@ class MetadataManager(val client: LightblueClient) {
         }
             .filter(_.isDefined) // remove Nones
             .map(_.get) // extract values from Somes
+
+    }
+
+    def getEntities(entityNamePattern: String, entityVersionFilter: List[EntityVersion] => Option[EntityVersion]): List[Entity] = {
+
+        implicit val pattern = entityNamePattern
+
+        getEntities(listEntities().filter(entityNameFilter), entityVersionFilter)
 
     }
 
@@ -248,7 +254,7 @@ object MetadataManager {
 
     // entity version selectors
     def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst { case v if v.defaultVersion => v }
-    def entityVersionNewest = (l: List[EntityVersion]) => Some(l.sortWith(versionCompare(_, _) > 0)(0))
+    def entityVersionNewest = (l: List[EntityVersion]) => if (l.isEmpty) None else Some(l.sortWith(versionCompare(_, _) > 0)(0))
     def entityVersionExplicit(version: String) = (l: List[EntityVersion]) => l collectFirst { case v if v.version == version => v }
 
     def versionCompare(v1: EntityVersion, v2: EntityVersion): Int = {
