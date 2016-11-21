@@ -8,6 +8,7 @@ import com.redhat.lightblue.metadata.MetadataManager._
 import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+import com.fasterxml.jackson.databind.node.ObjectNode
 
 /**
  * Unit tests in ScalaTest using FlatSpec style.
@@ -102,7 +103,6 @@ class MetadataManagerUnitTest extends FlatSpec with Matchers {
             new Entity(before).accessAnyone.text should be (new Entity(expected).text)
     }
 
-
     val jsonStr = """{"schema": {"_id": "id", "name":"Marek", "age":29, "foo": {"bar": "a", "zoo": 13, "nestedArray": ["c", "b", "a"]}, "array": ["c", "b", "a"], "arrayOfObjects": [{"foo": "bar"}, {"bar":"foo"}]}, "entityInfo": {"_id": "id"}}""";
 
     s"""getPath($jsonStr)""" should "return Marek for schema.name path" in {
@@ -136,6 +136,24 @@ class MetadataManagerUnitTest extends FlatSpec with Matchers {
          intercept[MetadataManagerException] {
              putPath(node, emptyArray, "path.dont.exist")
          }
+    }
+
+    "enity.compare" should "list no deltas for equal entities" in {
+        val e1 = new Entity(jsonStr)
+        val e2 = new Entity(jsonStr)
+
+        e1.compare(e2).size should be (0)
+    }
+
+    it should "list deltas for differences" in {
+        val e1 = new Entity(jsonStr)
+        val e2 = new Entity(jsonStr)
+
+        val n = mapper.createObjectNode()
+
+        e2.schemaJson.asInstanceOf[ObjectNode].put("newfield", "value")
+
+        e1.compare(e2).size should be (1)
     }
 
 }

@@ -28,6 +28,9 @@ import com.redhat.lightblue.metadata.MetadataManager._
 import com.redhat.lightblue.client.request.metadata.MetadataCreateSchemaRequest
 import java.util.regex.Pattern
 import scala.util.matching.Regex
+import jiff.JsonDiff
+import scala.collection.JavaConversions._
+import jiff.JsonDelta
 
 /*
  * Represents entity versions, as returned by /rest/metadata/{entity}/
@@ -83,6 +86,10 @@ class Entity(rootNode: ObjectNode) {
 
         putPath(copy, getPath(replaceFrom.json, path), path)
         new Entity(copy)
+    }
+
+    def compare(other: Entity): List[JsonDelta] = {
+        diff.computeDiff(json, other.json).toList
     }
 
     override def toString = s"""$name|$version"""
@@ -173,25 +180,20 @@ class MetadataManager(val client: LightblueClient) {
 
     }
 
-    // TODO: generate diff in java rather than relay on system diff tool
-    // Tried google-diff-match-patch and java-diff-utils, but was not able to produce usable results
-    // There are solutions using json patch (RFC 6902), but this is not very human readable
     def diffEntity(entity: Entity) {
         val remoteEntity = getEntity(entity.name, entityVersionNewest) match {
             case Some(x) => x
             case None => throw new Exception(s"""${entity.name} does not exist in this environment""")
         }
 
-        // save remote metadata locally
-        val remoteEntityFileName = s""".${remoteEntity.name}-remote.json"""
-        Files.write(Paths.get(remoteEntityFileName), remoteEntity.text.getBytes)
+        val deltas = entity.compare(remoteEntity)
 
-        // save local metadata to take --ignore operations into account
-        val localEntityFileName = s""".${remoteEntity.name}-local.json"""
-        Files.write(Paths.get(localEntityFileName), entity.text.getBytes)
+        if (!deltas.isEmpty) {
+            logger.info("Diff format: <field>(<local value> != <remote value>)")
+            logger.info("")
 
-        // prints diff to stdin using the system diff command
-        s"""diff -u $remoteEntityFileName $localEntityFileName""" !
+            deltas foreach { delta => logger.info(delta.toString()); logger.info("") }
+        }
     }
 
 
@@ -251,6 +253,11 @@ object MetadataManager {
     val indenter = new DefaultIndenter("    ", DefaultIndenter.SYS_LF)
     prettyPrinter.indentObjectsWith(indenter);
     prettyPrinter.indentArraysWith(indenter);
+
+    // diff provider
+    val diff = new jiff.JsonDiff()
+    diff.setOption(JsonDiff.Option.ARRAY_ORDER_INSIGNIFICANT);
+    diff.setOption(JsonDiff.Option.RETURN_LEAVES_ONLY);
 
     // entity version selectors
     def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst { case v if v.defaultVersion => v }
