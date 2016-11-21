@@ -53,9 +53,9 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
         val entityOption = Option.builder("e")
             .required(false)
             .longOpt("entity")
-            .desc("Entity name. You can use regular expression to match multiple entities by name.")
+            .desc("Entity name. You can use regular expression to match multiple entities by name. You can use $local to match all entities in current local directory).")
             .hasArg()
-            .argName("entity name or /regex/")
+            .argName("entity name or /regex/ or $local")
             .build();
 
         val versionOption = Option.builder("v")
@@ -158,7 +158,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
         operation match {
             case "list" => {
-                manager.listEntities.foreach(println(_))
+                manager.listEntities().foreach(println(_))
             }
             case "pull" => {
 
@@ -171,14 +171,22 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                 }
 
                 val version = parseVersion(cmd.getOptionValue("v"))
-                val entityName = cmd.getOptionValue("e")
+                val entityNameValue = cmd.getOptionValue("e")
 
-                manager.getEntities(entityName, version) foreach { remoteEntity =>
+                val remoteEntities = if (entityNameValue == "$local") {
+                    // -e $local means that all local entities are to be pulled from Lightblue (refresh)
+                    manager.getEntities(localEntityNames(), version)
+                } else {
+                    // entityNameValue could be a single entity name or pattern
+                    manager.getEntities(entityNameValue, version)
+                }
+
+                remoteEntities foreach { remoteEntity =>
                     if (cmd.hasOption("p")) {
                         // download metadata path from Lightblue and save it locally
                         val path = cmd.getOptionValue("p")
 
-                        val localEntity = new Entity(using(Source.fromFile(s"""$entityName.json""")) { source =>
+                        val localEntity = new Entity(using(Source.fromFile(s"""${remoteEntity.name}.json""")) { source =>
                             source.mkString
                         })
 
@@ -192,6 +200,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                         Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
                     }
                 }
+
 
             }
             case "diff" => {
@@ -218,22 +227,33 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     throw new ParseException("You need to provide either --entityInfoOnly or --schemaOnly switches, not both")
                 }
 
-                val entityName = cmd.getOptionValue("e")
+                val entityNameValue = cmd.getOptionValue("e")
 
-                val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
-                    source.mkString
+                // -e $local means that all local files are to be pulled
+                val entityNames = if (entityNameValue == "$local") {
+                    println(localEntityNames())
+                    localEntityNames()
+                } else {
+                    List(entityNameValue)
                 }
 
-                var entity = new Entity(metadata)
+                for (entityName <- entityNames) {
 
-                logger.debug(s"""Loaded $entity from local file""")
+                    val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
+                        source.mkString
+                    }
 
-                if (cmd.hasOption("eio")) {
-                    manager.putEntity(entity, MetadataScope.ENTITYINFO)
-                } else if (cmd.hasOption("so")) {
-                    manager.putEntity(entity, MetadataScope.SCHEMA)
-                } else {
-                    manager.putEntity(entity, MetadataScope.BOTH)
+                    var entity = new Entity(metadata)
+
+                    logger.debug(s"""Loaded $entity from local file""")
+
+                    if (cmd.hasOption("eio")) {
+                        manager.putEntity(entity, MetadataScope.ENTITYINFO)
+                    } else if (cmd.hasOption("so")) {
+                        manager.putEntity(entity, MetadataScope.SCHEMA)
+                    } else {
+                        manager.putEntity(entity, MetadataScope.BOTH)
+                    }
                 }
 
             }
@@ -246,6 +266,11 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             printUsage(options)
             System.exit(1);
         }
+    }
+
+    // return *.json file names from current directory
+    def localEntityNames(): List[String] = {
+        new java.io.File(".").listFiles.filter(f => { f.isFile() && f.getName.endsWith("json") && !f.getName.startsWith(".") }).map { f => f.getName.replaceAll("""\.json""", "") }.toList
     }
 
     def printUsage(options: Options) {
