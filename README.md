@@ -43,12 +43,6 @@ Should print a list of all entities.
 
 ## Examples
 
-### Download multiple entities
-```
-lbmd pull --env dev -e "/.*/" -v newest # download all newest versions
-lbmd pull --env dev -e "/^(user|legalEntity).*/" -v newest # download all entities starting with user or legalEntity entity
-```
-
 ### Make changes in metadata
 ```
 lbmd pull --env dev -e user -v newest # saves newest user.json version in your current directory
@@ -56,11 +50,6 @@ vim user.json # make changes in user metadata
 lbmd diff --env dev -e user # diff your local user copy against newest user version in Lightblue
 lbmd push --env dev -e user # Update metadata in Lightblue in dev
 lbmd push --env qa -e user # Update metadata in Lightblue in qa
-```
-
-### Upload only schema
-```
-lbmd push --env qa -e user --schemaOnly
 ```
 
 ### Merge metadata
@@ -72,6 +61,23 @@ lbmd pull --env prod -e user -v newest --path entityInfo.indexes # Merge entityI
 lbmd diff --env prod -e user # diff your local copy against prod to see what will get pushed
 lbmd push --env prod -e user # update metadata in prod
 ```
+
+### More pull examples
+```
+lbmd pull --env dev -e user -v 0.0.2 # download user entity version 0.0.2
+lbmd pull --env dev -e user -v default # download default user entity version
+lbmd pull --env dev -e \$all -v newest # download all newest versions
+lbmd pull --env dev -e \$local -v newest # refresh all entities in local working directory with remote newest versions
+lbmd pull --env dev -e "/^(user|legalEntity).*/" -v newest # download all entities starting with user or legalEntity entity
+```
+
+### More push examples
+```
+lbmd push --env qa -e user --schemaOnly # upload schema only
+lbmd push --env qa -e user --entityInfoOnly # upload entityInfoOnly
+lbmd push --env qa -e \$all # upload all entities in your local working directory
+```
+
 
 ## Debug
 
