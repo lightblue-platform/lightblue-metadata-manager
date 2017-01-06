@@ -13,12 +13,10 @@ Yes, it's similar to working in git.
 ```
 usage: MetadataManagerApp$ <operation> <options>
 
-Available operations: list, pull, push, diff. Add -h after operation to see options it accepts.
+Available operations: list, pull, push, diff and set. Add -h after operation to see options it accepts.
 
 Options:
-    --env <environment, e.g. dev>                       Lightblue environment (export LB_CLIENT_{ENV}=/home/user/lightblue-clients/lightblue-client-{ENV}.properties
- -h,--help                                              Prints usage.
- -lc,--lightblue-client <lightblue-client.properties>   Configuration file for lightblue-client. --env is recommended instead.
+ -h,--help   Prints usage.
 ```
 
 ## Installation
