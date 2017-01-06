@@ -25,6 +25,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     def this(args: String, client: LightblueClient) = this(args.split(" "), Some(client))
 
     val logger = LoggerFactory.getLogger(MetadataManagerApp.getClass);
+    implicit val implicitClient = _client
 
     val options = new Options();
 
@@ -86,9 +87,21 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .desc("Push schema only.")
             .build();
 
+        val setChangelogOption = Option.builder("cl")
+            .required(false)
+            .longOpt("changelog")
+            .desc("Set version.changelog")
+            .hasArg()
+            .build()
+
+        val setVersionsOption = Option.builder("vs")
+            .required(false)
+            .longOpt("versions")
+            .desc("Set schema version.value and entityInfo.defaultVersion")
+            .hasArg()
+            .build()
+
         // options which apply to any operation
-        options.addOption(lbClientOption)
-        options.addOption(envOption)
         options.addOption(helpOption)
 
         if (args.length == 0) {
@@ -100,18 +113,33 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
         // operation specific options
         operation match {
+             case "list" => {
+                options.addOption(lbClientOption)
+                options.addOption(envOption)
+            }
             case "pull" => {
+                options.addOption(lbClientOption)
+                options.addOption(envOption)
                 options.addOption(entityOption)
                 options.addOption(versionOption)
                 options.addOption(pathOption)
             }
             case "push" => {
+                options.addOption(lbClientOption)
+                options.addOption(envOption)
                 options.addOption(entityOption)
                 options.addOption(entityInfoOnlyOption)
                 options.addOption(schemaOnlyOption)
             }
             case "diff" => {
+                options.addOption(lbClientOption)
+                options.addOption(envOption)
                 options.addOption(entityOption)
+            }
+            case "set" => {
+                options.addOption(entityOption)
+                options.addOption(setVersionsOption)
+                options.addOption(setChangelogOption)
             }
             case _ => ;
         }
@@ -119,46 +147,24 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
         val optionsArgs = args.slice(1, args.length)
 
         val parser = new DefaultParser()
-        val cmd = parser.parse(options, optionsArgs)
+        implicit val cmd = parser.parse(options, optionsArgs)
 
         if (cmd.hasOption('h')) {
             printUsage(options)
             System.exit(0);
         }
 
-        if (!List("push", "pull", "diff", "list").contains(operation)) {
+        if (!List("push", "pull", "diff", "list", "set").contains(operation)) {
             throw new ParseException(s"""Unsupported operation $operation""")
         }
 
-        if (cmd.hasOption("lc") && cmd.hasOption("env") || !cmd.hasOption("lc") && !cmd.hasOption("env")) {
+        if (cmd.hasOption("lc") && cmd.hasOption("env")) {
             throw new ParseException("Either -lc or --env is required");
         }
 
-        val client = _client match {
-            case None => {
-
-                val lbClientFilePath = if (cmd.hasOption("lc")) cmd.getOptionValue("lc") else {
-                    val envVarName = "LB_CLIENT_" + cmd.getOptionValue("env").toUpperCase()
-                    System.getenv(envVarName) match {
-                        case null => throw new ParseException(s"""${envVarName} is not set!""")
-                        case x    => x
-                    }
-                }
-
-                logger.debug(s"""Reading lightblue client configuration from ${lbClientFilePath}""")
-                new LightblueHttpClient(lbClientFilePath);
-            }
-            case Some(x) => {
-                logger.debug("""Lightblue client passed to cli.""")
-                x
-            }
-        }
-
-        val manager = new MetadataManager(client)
-
         operation match {
             case "list" => {
-                manager.listEntities().foreach(println(_))
+                metadataManager.listEntities().foreach(println(_))
             }
             case "pull" => {
 
@@ -175,10 +181,10 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                 val remoteEntities = if (entityNameValue == "$local") {
                     // -e $local means that all local entities are to be pulled from Lightblue (refresh)
-                    manager.getEntities(localEntityNames(), version)
+                    metadataManager.getEntities(localEntityNames(), version)
                 } else {
                     // entityNameValue could be a single entity name or pattern
-                    manager.getEntities(entityNameValue, version)
+                    metadataManager.getEntities(entityNameValue, version)
                 }
 
                 remoteEntities foreach { remoteEntity =>
@@ -200,8 +206,6 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                         Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
                     }
                 }
-
-
             }
             case "diff" => {
                 if (!cmd.hasOption("e")) {
@@ -216,7 +220,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                 var entity = new Entity(metadata)
 
-                manager.diffEntity(entity)
+                metadataManager.diffEntity(entity)
             }
             case "push" => {
                 if (!cmd.hasOption("e")) {
@@ -248,14 +252,37 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     logger.debug(s"""Loaded $entity from local file""")
 
                     if (cmd.hasOption("eio")) {
-                        manager.putEntity(entity, MetadataScope.ENTITYINFO)
+                        metadataManager.putEntity(entity, MetadataScope.ENTITYINFO)
                     } else if (cmd.hasOption("so")) {
-                        manager.putEntity(entity, MetadataScope.SCHEMA)
+                        metadataManager.putEntity(entity, MetadataScope.SCHEMA)
                     } else {
-                        manager.putEntity(entity, MetadataScope.BOTH)
+                        metadataManager.putEntity(entity, MetadataScope.BOTH)
                     }
                 }
 
+            }
+            case "set" => {
+                if (!cmd.hasOption("e")) {
+                    throw new MissingArgumentException("-e <entity name> is required")
+                }
+
+                val entityName = cmd.getOptionValue("e")
+
+                val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
+                    source.mkString
+                }
+
+                var entity = new Entity(metadata)
+
+                if (cmd.hasOption("vs")) {
+                    entity = entity.version(cmd.getOptionValue("vs"))
+                }
+
+                if (cmd.hasOption("cl")) {
+                    entity = entity.changelog(cmd.getOptionValue("cl"))
+                }
+
+                Files.write(Paths.get(s"""${entityName}.json"""), entity.text.getBytes)
             }
             case other => throw new UnsupportedOperationException(s"""Unknown operation $other""")
         }
@@ -276,7 +303,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     def printUsage(options: Options) {
         val formatter = new HelpFormatter();
         formatter.printHelp(180, MetadataManagerApp.getClass.getSimpleName + " <operation> <options>",
-            "\nAvailable operations: list, pull, push, diff. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
+            "\nAvailable operations: list, pull, push, diff and set. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
 
     }
 
@@ -285,6 +312,46 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             case "default" => MetadataManager.entityVersionDefault
             case "newest"  => MetadataManager.entityVersionNewest
             case x         => MetadataManager.entityVersionExplicit(x)
+        }
+    }
+
+    /**
+     * Initialize Lightblue client from cli. Use explicitly passed client if provided (for unit tests).
+     *
+     */
+    def createClient(cmd: CommandLine, client: scala.Option[LightblueClient]): scala.Option[LightblueClient] = {
+        client match {
+            case None => {
+
+                if (!cmd.hasOption("lc") && !cmd.hasOption("env")) {
+                    None
+                } else {
+                    val lbClientFilePath = if (cmd.hasOption("lc")) cmd.getOptionValue("lc") else {
+                        val envVarName = "LB_CLIENT_" + cmd.getOptionValue("env").toUpperCase()
+                        System.getenv(envVarName) match {
+                            case null => throw new ParseException(s"""${envVarName} is not set!""")
+                            case x    => x
+                        }
+                    }
+
+                    logger.debug(s"""Reading lightblue client configuration from ${lbClientFilePath}""")
+                    Some(new LightblueHttpClient(lbClientFilePath))
+                }
+            }
+            case Some(x) => {
+                logger.debug("""Lightblue client passed to cli.""")
+                Some(x)
+            }
+        }
+    }
+
+    /**
+     * create metadata manager
+     */
+    def metadataManager(implicit cmd: CommandLine, client: scala.Option[LightblueClient]): MetadataManager = {
+        createClient(cmd, client) match {
+            case None => throw new Exception("Lightblue client is needed to create MetadataManager!")
+            case Some(x) => new MetadataManager(x)
         }
     }
 

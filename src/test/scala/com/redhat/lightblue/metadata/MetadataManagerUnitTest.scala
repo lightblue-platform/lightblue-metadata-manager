@@ -138,7 +138,7 @@ class MetadataManagerUnitTest extends FlatSpec with Matchers {
          }
     }
 
-    "enity.compare" should "list no deltas for equal entities" in {
+    "entity.compare" should "list no deltas for equal entities" in {
         val e1 = new Entity(jsonStr)
         val e2 = new Entity(jsonStr)
 
@@ -154,6 +154,40 @@ class MetadataManagerUnitTest extends FlatSpec with Matchers {
         e2.schemaJson.asInstanceOf[ObjectNode].put("newfield", "value")
 
         e1.compare(e2).size should be (1)
+    }
+
+    val entityVersionStr = """{
+	"schema": {
+		"version": {
+		  "value": "0.0.1-SNAPSHOT"
+		},
+		"field": {
+			"foo": "bar"
+		}
+	},
+	"entityInfo": {
+		"defaultVersion": "0.0.1-SNAPSHOT"
+	}
+}"""
+
+    "entity.version" should "set schema and default version" in {
+        val e1 = new Entity(entityVersionStr)
+        val e2 = e1.version("0.0.1")
+
+        e2.schemaJson.get("version").get("value").asText should be ("0.0.1")
+        e2.entityInfoJson.get("defaultVersion").asText should be ("0.0.1")
+        e2.schemaJson.has("field") should be (true)
+        e1.schemaJson.get("version").get("value").asText should be ("0.0.1-SNAPSHOT")
+        e1.entityInfoJson.get("defaultVersion").asText should be ("0.0.1-SNAPSHOT")
+    }
+
+    "entity.changelog" should "set changelog" in {
+        val e1 = new Entity(entityVersionStr)
+        val e2 = e1.changelog("foobar")
+
+        e2.schemaJson.get("version").get("changelog").asText should be ("foobar")
+        e2.schemaJson.has("field") should be (true)
+        e1.schemaJson.get("version").has("changelog") should be (false)
     }
 
 }

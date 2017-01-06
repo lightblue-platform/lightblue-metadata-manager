@@ -31,6 +31,7 @@ import scala.util.matching.Regex
 import jiff.JsonDiff
 import scala.collection.JavaConversions._
 import jiff.JsonDelta
+import com.fasterxml.jackson.databind.node.TextNode
 
 /*
  * Represents entity versions, as returned by /rest/metadata/{entity}/
@@ -43,6 +44,8 @@ case class EntityVersion(version: String, changelog: String, status: String, def
  *
  */
 class Entity(rootNode: ObjectNode) {
+
+    implicit val implicitRootNode = rootNode
 
     def this(jsonStr: String) = this(parseJson(jsonStr))
 
@@ -67,29 +70,64 @@ class Entity(rootNode: ObjectNode) {
 
     // set all arrays in entityInfo.access to ["anyone"]
     def accessAnyone: Entity = {
-        val copy = rootNode.deepCopy()
-        val accessNode = copy.get("schema").get("access").asInstanceOf[ObjectNode]
-        val accessArray = mapper.createArrayNode().add("anyone")
 
-        accessNode.fieldNames().foreach(accessNode.set(_, accessArray))
+        modifyCopy {
+            (rootNode) => {
+                val accessNode = rootNode.get("schema").get("access").asInstanceOf[ObjectNode]
+                val accessArray = mapper.createArrayNode().add("anyone")
 
-        new Entity(copy)
+                accessNode.fieldNames().foreach(accessNode.set(_, accessArray))
+            }
+        }
     }
 
     // replace node specified by path with the same node from another entity
     def replacePath(path: String, replaceFrom: Entity): Entity = {
         logger.debug(s"""Replacing $path""")
-        val copy = rootNode.deepCopy()
 
-        val nodeFromPath = getPath(replaceFrom.json, path)
-        logger.debug(s"""Replacing with $nodeFromPath""")
+        modifyCopy {
+            (rootNode) => {
+                val nodeFromPath = getPath(replaceFrom.json, path)
+                logger.debug(s"""Replacing with $nodeFromPath""")
 
-        putPath(copy, getPath(replaceFrom.json, path), path)
-        new Entity(copy)
+                putPath(rootNode, getPath(replaceFrom.json, path), path)
+            }
+        }
     }
 
     def compare(other: Entity): List[JsonDelta] = {
         diff.computeDiff(json, other.json).toList
+    }
+
+    def changelog(message: String): Entity = {
+        logger.debug(s"""Setting changelog to $message""")
+
+        modifyCopy {
+            (rootNode) => {
+                putPath(rootNode, TextNode.valueOf(message), "schema.version.changelog")
+            }
+        }
+    }
+
+    def version(version: String): Entity = {
+        logger.debug(s"""Setting version to $version""")
+
+        modifyCopy {
+            (rootNode) => {
+                putPath(rootNode, TextNode.valueOf(version), "schema.version.value")
+
+                if (rootNode.get("entityInfo").has("defaultVersion")) {
+                    putPath(rootNode, TextNode.valueOf(version), "entityInfo.defaultVersion")
+                }
+            }
+        }
+    }
+
+    // control structure to operate on a ObjectNode copy and return new Entity
+    private def modifyCopy(modifyLogic: (ObjectNode) => Unit)(implicit rootNode: ObjectNode): Entity = {
+        val copy = rootNode.deepCopy()
+        modifyLogic(copy)
+        new Entity(copy)
     }
 
     override def toString = s"""$name|$version"""
