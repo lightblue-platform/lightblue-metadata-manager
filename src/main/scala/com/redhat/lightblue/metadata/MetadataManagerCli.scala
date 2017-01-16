@@ -25,7 +25,6 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     def this(args: String, client: LightblueClient) = this(args.split(" "), Some(client))
 
     val logger = LoggerFactory.getLogger(MetadataManagerApp.getClass);
-    implicit val implicitClient = _client
 
     val options = new Options();
 
@@ -147,7 +146,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
         val optionsArgs = args.slice(1, args.length)
 
         val parser = new DefaultParser()
-        implicit val cmd = parser.parse(options, optionsArgs)
+        val cmd = parser.parse(options, optionsArgs)
 
         if (cmd.hasOption('h')) {
             printUsage(options)
@@ -162,9 +161,20 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             throw new ParseException("Either -lc or --env is required");
         }
 
+        // initialize Lightblue client
+        // use explicitly passed client if provided (for unit tests)
+        implicit val lbClient = _client match {
+            case Some(x) => {
+                logger.debug("""Lightblue client passed to cli.""")
+                Some(x)
+            }
+            case None => createClient(cmd)
+        }
+
+
         operation match {
             case "list" => {
-                metadataManager.listEntities().foreach(println(_))
+                createMetadataManager().listEntities().foreach(println)
             }
             case "pull" => {
 
@@ -181,10 +191,10 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                 val remoteEntities = if (entityNameValue == "$local") {
                     // -e $local means that all local entities are to be pulled from Lightblue (refresh)
-                    metadataManager.getEntities(localEntityNames(), version)
+                    createMetadataManager().getEntities(localEntityNames(), version)
                 } else {
                     // entityNameValue could be a single entity name or pattern
-                    metadataManager.getEntities(entityNameValue, version)
+                    createMetadataManager().getEntities(entityNameValue, version)
                 }
 
                 remoteEntities foreach { remoteEntity =>
@@ -220,7 +230,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                 var entity = new Entity(metadata)
 
-                metadataManager.diffEntity(entity)
+                createMetadataManager().diffEntity(entity)
             }
             case "push" => {
                 if (!cmd.hasOption("e")) {
@@ -235,7 +245,6 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                 // -e $local means that all local files are to be pulled
                 val entityNames = if (entityNameValue == "$local") {
-                    println(localEntityNames())
                     localEntityNames()
                 } else {
                     List(entityNameValue)
@@ -252,11 +261,11 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     logger.debug(s"""Loaded $entity from local file""")
 
                     if (cmd.hasOption("eio")) {
-                        metadataManager.putEntity(entity, MetadataScope.ENTITYINFO)
+                        createMetadataManager().putEntity(entity, MetadataScope.ENTITYINFO)
                     } else if (cmd.hasOption("so")) {
-                        metadataManager.putEntity(entity, MetadataScope.SCHEMA)
+                        createMetadataManager().putEntity(entity, MetadataScope.SCHEMA)
                     } else {
-                        metadataManager.putEntity(entity, MetadataScope.BOTH)
+                        createMetadataManager().putEntity(entity, MetadataScope.BOTH)
                     }
                 }
 
@@ -316,40 +325,33 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     }
 
     /**
-     * Initialize Lightblue client from cli. Use explicitly passed client if provided (for unit tests).
+     * Initialize Lightblue client from cli.
      *
      */
-    def createClient(cmd: CommandLine, client: scala.Option[LightblueClient]): scala.Option[LightblueClient] = {
-        client match {
-            case None => {
+    def createClient(cmd: CommandLine): scala.Option[LightblueClient] = {
 
-                if (!cmd.hasOption("lc") && !cmd.hasOption("env")) {
-                    None
-                } else {
-                    val lbClientFilePath = if (cmd.hasOption("lc")) cmd.getOptionValue("lc") else {
-                        val envVarName = "LB_CLIENT_" + cmd.getOptionValue("env").toUpperCase()
-                        System.getenv(envVarName) match {
-                            case null => throw new ParseException(s"""${envVarName} is not set!""")
-                            case x    => x
-                        }
-                    }
-
-                    logger.debug(s"""Reading lightblue client configuration from ${lbClientFilePath}""")
-                    Some(new LightblueHttpClient(lbClientFilePath))
+        if (!cmd.hasOption("lc") && !cmd.hasOption("env")) {
+            None
+        } else {
+            val lbClientFilePath = if (cmd.hasOption("lc")) cmd.getOptionValue("lc") else {
+                val envVarName = "LB_CLIENT_" + cmd.getOptionValue("env").toUpperCase()
+                System.getenv(envVarName) match {
+                    case null => throw new ParseException(s"""${envVarName} is not set!""")
+                    case x    => x
                 }
             }
-            case Some(x) => {
-                logger.debug("""Lightblue client passed to cli.""")
-                Some(x)
-            }
+
+            logger.debug(s"""Reading lightblue client configuration from ${lbClientFilePath}""")
+            Some(new LightblueHttpClient(lbClientFilePath))
         }
+
     }
 
     /**
      * create metadata manager
      */
-    def metadataManager(implicit cmd: CommandLine, client: scala.Option[LightblueClient]): MetadataManager = {
-        createClient(cmd, client) match {
+    def createMetadataManager()(implicit client: scala.Option[LightblueClient]): MetadataManager = {
+        client match {
             case None => throw new Exception("Lightblue client is needed to create MetadataManager!")
             case Some(x) => new MetadataManager(x)
         }
