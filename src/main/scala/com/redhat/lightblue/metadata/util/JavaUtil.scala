@@ -1,4 +1,4 @@
-package com.redhat.lightblue.metadata
+package com.redhat.lightblue.metadata.util
 
 object JavaUtil {
 

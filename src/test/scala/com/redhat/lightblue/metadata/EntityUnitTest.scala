@@ -4,8 +4,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.redhat.lightblue.metadata.MetadataManager._
-import com.redhat.lightblue.metadata.MetadataManager.entityNameFilter
+import com.redhat.lightblue.metadata.Entity._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -14,7 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
  * Unit tests in ScalaTest using FlatSpec style.
  */
 @RunWith(classOf[JUnitRunner])
-class MetadataManagerUnitTest extends FlatSpec with Matchers {
+class EntityUnitTest extends FlatSpec with Matchers {
 
     "/^user.*/ entity name filter" should "match only entities starting with user" in {
         implicit val pattern = "/^user.*/"

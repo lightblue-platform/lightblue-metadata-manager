@@ -1,4 +1,4 @@
-package com.redhat.lightblue.metadata
+package com.redhat.lightblue.metadata.util
 
 /**
  * From the book, Beginning Scala, by David Pollak.
