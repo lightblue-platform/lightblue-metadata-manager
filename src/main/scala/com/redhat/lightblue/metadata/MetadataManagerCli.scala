@@ -5,15 +5,19 @@ import java.nio.file.Paths
 
 import scala.io.Source
 
-import org.apache.commons.cli._
+import org.apache.commons.cli.CommandLine
+import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.HelpFormatter
-import org.slf4j._
+import org.apache.commons.cli.MissingArgumentException
+import org.apache.commons.cli.Option
+import org.apache.commons.cli.Options
+import org.apache.commons.cli.ParseException
+import org.slf4j.LoggerFactory
 
-import com.redhat.lightblue.client.http.LightblueHttpClient
-import com.redhat.lightblue.client.http.LightblueHttpClient
-import com.redhat.lightblue.metadata.Control._
-import com.redhat.lightblue.metadata.MetadataManager._
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.redhat.lightblue.client.LightblueClient
+import com.redhat.lightblue.client.http.LightblueHttpClient
+import com.redhat.lightblue.metadata.util.Control.using
 
 /**
  * Command Line Interface for {@link MetadataManager}.
@@ -318,9 +322,9 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
     def parseVersion(version: String): List[EntityVersion] => scala.Option[EntityVersion] = {
         version match {
-            case "default" => MetadataManager.entityVersionDefault
-            case "newest"  => MetadataManager.entityVersionNewest
-            case x         => MetadataManager.entityVersionExplicit(x)
+            case "default" => Entity.entityVersionDefault
+            case "newest"  => Entity.entityVersionNewest
+            case x         => Entity.entityVersionExplicit(x)
         }
     }
 
