@@ -55,11 +55,19 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .build();
 
         val entityOption = Option.builder("e")
-            .required(false)
+            .required(true)
             .longOpt("entity")
             .desc("Entity name. You can use regular expression to match multiple entities by name. You can use $local to match all entities in current local directory).")
             .hasArg()
             .argName("entity name or /regex/ or $local")
+            .build();
+
+         val singleEntityOption = Option.builder("e")
+            .required(true)
+            .longOpt("entity")
+            .desc("Entity name.")
+            .hasArg()
+            .argName("entity name")
             .build();
 
         val versionOption = Option.builder("v")
@@ -104,6 +112,13 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .hasArg()
             .build()
 
+        val patchOption = Option.builder("p")
+            .required(true)
+            .longOpt("patch")
+            .desc("A file containing RFC 6902 JSON patch")
+            .hasArg()
+            .build()
+
         // options which apply to any operation
         options.addOption(helpOption)
 
@@ -137,12 +152,16 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             case "diff" => {
                 options.addOption(lbClientOption)
                 options.addOption(envOption)
-                options.addOption(entityOption)
+                options.addOption(singleEntityOption)
             }
             case "set" => {
-                options.addOption(entityOption)
+                options.addOption(singleEntityOption)
                 options.addOption(setVersionsOption)
                 options.addOption(setChangelogOption)
+            }
+            case "apply" => {
+                options.addOption(singleEntityOption)
+                options.addOption(patchOption)
             }
             case _ => ;
         }
@@ -157,7 +176,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             System.exit(0);
         }
 
-        if (!List("push", "pull", "diff", "list", "set").contains(operation)) {
+        if (!List("push", "pull", "diff", "list", "set", "apply").contains(operation)) {
             throw new ParseException(s"""Unsupported operation $operation""")
         }
 
@@ -232,9 +251,30 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     source.mkString
                 }
 
-                var entity = new Entity(metadata)
+                val entity = new Entity(metadata)
 
                 createMetadataManager().diffEntity(entity)
+            }
+            case "apply" => {
+                val entityName = cmd.getOptionValue("e")
+                val patchFilePath = cmd.getOptionValue("p")
+
+                val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
+                    source.mkString
+                }
+
+                val patch = using(Source.fromFile(s"""$patchFilePath""")) { source =>
+                    source.mkString
+                }
+
+                val entity = new Entity(metadata)
+
+                val patchedEntity = entity.apply(Entity.mapper.readTree(patch))
+
+                Files.write(Paths.get(s"""${entityName}.json"""), patchedEntity.text.getBytes)
+
+                logger.info(s"""Patched $patchedEntity""")
+
             }
             case "push" => {
                 if (!cmd.hasOption("e")) {
@@ -316,7 +356,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     def printUsage(options: Options) {
         val formatter = new HelpFormatter();
         formatter.printHelp(180, MetadataManagerApp.getClass.getSimpleName + " <operation> <options>",
-            "\nAvailable operations: list, pull, push, diff and set. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
+            "\nAvailable operations: list, pull, push, diff, apply and set. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
 
     }
 
