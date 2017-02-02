@@ -62,7 +62,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .argName("entity name or /regex/ or $local")
             .build();
 
-         val singleEntityOption = Option.builder("e")
+        val singleEntityOption = Option.builder("e")
             .required(true)
             .longOpt("entity")
             .desc("Entity name.")
@@ -112,10 +112,17 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .hasArg()
             .build()
 
-        val patchOption = Option.builder("p")
-            .required(true)
-            .longOpt("patch")
+        val jsonPatchOption = Option.builder("jp")
+            .required(false)
+            .longOpt("json-patch")
             .desc("A file containing RFC 6902 JSON patch")
+            .hasArg()
+            .build()
+
+        val jsPatchOption = Option.builder("jsp")
+            .required(false)
+            .longOpt("js-patch")
+            .desc("A file containing entity modification logic in javascript")
             .hasArg()
             .build()
 
@@ -161,7 +168,8 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             }
             case "apply" => {
                 options.addOption(singleEntityOption)
-                options.addOption(patchOption)
+                options.addOption(jsonPatchOption)
+                options.addOption(jsPatchOption)
             }
             case _ => ;
         }
@@ -256,20 +264,40 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                 createMetadataManager().diffEntity(entity)
             }
             case "apply" => {
+
+//                if (!(cmd.hasOption("jsp") == cmd.hasOption("jp"))) {
+//                    throw new MissingArgumentException("Either -jp <json patch> or -jsp <javascript> is required")
+//                }
+
                 val entityName = cmd.getOptionValue("e")
-                val patchFilePath = cmd.getOptionValue("p")
 
                 val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
                     source.mkString
                 }
 
-                val patch = using(Source.fromFile(s"""$patchFilePath""")) { source =>
-                    source.mkString
-                }
-
                 val entity = new Entity(metadata)
 
-                val patchedEntity = entity.apply(Entity.mapper.readTree(patch))
+                val patchedEntity = if (cmd.hasOption("jp")) {
+                    // json patch
+
+                    val patchPath = cmd.getOptionValue("jp")
+
+                    val patchStr = using(Source.fromFile(patchPath)) { source =>
+                        source.mkString
+                    }
+
+                    entity.apply(Entity.mapper.readTree(patchStr))
+                } else {
+                    // javascript
+
+                    val patchPath = cmd.getOptionValue("jsp")
+
+                    val patchStr = using(Source.fromFile(patchPath)) { source =>
+                        source.mkString
+                    }
+
+                    entity.apply(patchStr)
+                }
 
                 Files.write(Paths.get(s"""${entityName}.json"""), patchedEntity.text.getBytes)
 

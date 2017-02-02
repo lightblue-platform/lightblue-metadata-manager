@@ -1,6 +1,7 @@
 package com.redhat.lightblue.metadata
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConversions.asScalaIterator
+import scala.io.Source
 
 import org.slf4j.LoggerFactory
 
@@ -14,10 +15,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.TextNode
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.redhat.lightblue.metadata.Entity._
-import com.redhat.lightblue.metadata.util.JavaUtil
 import com.flipkart.zjsonpatch.JsonDiff
 import com.flipkart.zjsonpatch.JsonPatch
+import com.redhat.lightblue.metadata.Entity.getPath
+import com.redhat.lightblue.metadata.Entity.logger
+import com.redhat.lightblue.metadata.Entity.mapper
+import com.redhat.lightblue.metadata.Entity.parseJson
+import com.redhat.lightblue.metadata.Entity.processWithJavascript
+import com.redhat.lightblue.metadata.Entity.putPath
+import com.redhat.lightblue.metadata.Entity.toSortedFormatedString
+import com.redhat.lightblue.metadata.util.JavaUtil
+
+import javax.script.ScriptEngineManager
 
 /*
  * Represents entity versions, as returned by /rest/metadata/{entity}/
@@ -123,6 +132,16 @@ class Entity(rootNode: ObjectNode) {
         new Entity(JsonPatch.apply(patch, rootNode).asInstanceOf[ObjectNode])
     }
 
+    /**
+     * Apply javascript logic.
+     *
+     */
+    def apply(javascriptCode: String): Entity = {
+       logger.debug(s"""Processing with $javascriptCode""")
+
+       new Entity(processWithJavascript(rootNode, javascriptCode))
+    }
+
     // control structure to operate on a ObjectNode copy and return new Entity
     private def modifyCopy(modifyLogic: (ObjectNode) => Unit)(implicit rootNode: ObjectNode): Entity = {
         val copy = rootNode.deepCopy()
@@ -169,6 +188,11 @@ object Entity {
     val indenter = new DefaultIndenter("    ", DefaultIndenter.SYS_LF)
     prettyPrinter.indentObjectsWith(indenter);
     prettyPrinter.indentArraysWith(indenter);
+
+    // javascript engine
+    val util_js = Source.fromInputStream(getClass.getResourceAsStream("/util.js")).mkString
+    val engine = new ScriptEngineManager().getEngineByMimeType("text/javascript")
+    engine.eval(util_js)
 
     // entity version selectors
     def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst { case v if v.defaultVersion => v }
@@ -253,6 +277,8 @@ object Entity {
 
     def toFormatedString(json: JsonNode) = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json)
 
+    def toString(json: JsonNode) = mapper.writeValueAsString(json)
+
     def parseJson(json: String): ObjectNode = {
         mapper.readTree(json).asInstanceOf[ObjectNode]
     }
@@ -293,6 +319,23 @@ object Entity {
             case true => putPath(node.get(nextField), nodePut, remainingPath)
             case false => throw new MetadataManagerException(s"""nextField not found!""")
         }
+    }
+
+    def processWithJavascript(node: JsonNode, javascriptCode: String) = {
+
+        val jsonNodeStr = toString(node)
+            .replaceAll("'", """\\'""")
+            .replaceAll("""\\"""", """\\\\"""") // TODO: why multiple backslashes?
+
+        val result = engine.eval(s"""
+          var entity = JSON.parse('$jsonNodeStr');
+
+          $javascriptCode
+
+          JSON.stringify(entity);
+          """)
+
+        parseJson(result.toString())
     }
 
 }

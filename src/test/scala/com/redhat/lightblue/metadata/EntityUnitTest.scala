@@ -9,6 +9,8 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.ArrayNode
+import scala.io.Source
+import junit.framework.Assert
 
 /**
  * Unit tests in ScalaTest using FlatSpec style.
@@ -179,9 +181,11 @@ class EntityUnitTest extends FlatSpec with Matchers {
 		},
 		"arrayInt": [1, 2, 3, 4],
 		"arrayObj": [{
+		    "id": 10,
 			"a": "b",
 			"c": "d"
 		}, {
+		    "id": 20,
 			"e": "f",
 			"g": "h"
 		}],
@@ -202,14 +206,17 @@ class EntityUnitTest extends FlatSpec with Matchers {
 		},
 		"arrayInt": [1, 2, 3, 4, 5, 6],
 		"arrayObj": [{
+		    "id": 10,
 			"a": "b",
 			"c": "d"
 		},
 		{
+		    "id": 15,
 			"1": "2",
 			"3": "4"
 		},
 		{
+		    "id": 20,
 			"e": "f",
 			"g": "h"
 		}],
@@ -230,13 +237,16 @@ class EntityUnitTest extends FlatSpec with Matchers {
 		},
 		"arrayInt": [1, 2, 3, 4],
 		"arrayObj": [{
+		    "id": 10,
 			"a": "b",
 			"c": "d"
 		}, {
+		    "id": 20,
 			"e": "f",
 			"g": "h"
 		},
 		{
+		    "id": 30,
 			"new": "val",
 			"val": "new"
 		}],
@@ -246,7 +256,8 @@ class EntityUnitTest extends FlatSpec with Matchers {
 	},
 	"entityInfo": {
 		"defaultVersion": "0.0.1-SNAPSHOT",
-		"name": "entity"
+		"name": "entity",
+		"changelog": "'Single quote', \"double quote\""
 	}
 }"""
 
@@ -301,7 +312,7 @@ val jsonDiff = """[ {
         diff.asInstanceOf[ArrayNode].size() should be (1)
     }
 
-    "entity.patch" should "apply a replace patch to source" in {
+    "entity.apply(JsonPatch)" should "apply a replace patch to source" in {
 
         val e1 = new Entity(entity1)
         val e2 = e1.version("0.0.1")
@@ -337,6 +348,11 @@ val jsonDiff = """[ {
         patched should be (e2)
     }
 
+    implicit class TestEntityHelper(e: Entity) {
+        def arrayObj = e.json.get("schema").get("arrayObj").asInstanceOf[ArrayNode]
+        def arrayInt = e.json.get("schema").get("arrayInt").asInstanceOf[ArrayNode]
+    }
+
     it should "be able to merge a sequance of patches" in {
 
         val e1 = new Entity(entity1)
@@ -348,8 +364,51 @@ val jsonDiff = """[ {
 
         val patched = e1.apply(patch12).apply(patch23)
 
-        patched.json.get("schema").get("arrayInt").asInstanceOf[ArrayNode].size() should be (6)
-        patched.json.get("schema").get("arrayObj").asInstanceOf[ArrayNode].size() should be (4)
+        patched.arrayInt.size() should be (6)
+        patched.arrayObj.size() should be (4)
+
+        patched.arrayObj.get(0).get("id").asInt() should be (10)
+        patched.arrayObj.get(1).get("id").asInt() should be (15)
+        // changed the order, but inserted all elements
+        patched.arrayObj.get(2).get("id").asInt() should be (30)
+        patched.arrayObj.get(3).get("id").asInt() should be (20)
     }
 
+    // json patch operates on array indexes, making modify and remove operations unpredictable
+    // to make sure your patch delivers expected changes regardless of target entity state,
+    // prepare a javascript patch:
+
+    "entity.apply(javascript)" should "allow to remove array element by arbitrary criteria" in {
+
+        val e3 = new Entity(entity3)
+
+        val patched = e3 apply s"""
+          entity.schema.arrayObj.remove(function(el, i) {
+              return el.id > 10;
+          });
+        """
+
+        patched.arrayObj.size() should be (1)
+        patched.arrayObj.get(0).get("id").asInt() should be (10)
+    }
+
+    "entity.apply(javascript)" should "allow to modify array element by arbitrary criteria" in {
+
+        val e3 = new Entity(entity3)
+
+        val patched = e3 apply s"""
+          entity.schema.arrayObj.modify(function(el) {
+              return el.id > 10;
+          },
+          function(el) {
+              el.hasIdGreaterThan10 = true;
+              return el;
+          });
+        """
+
+        patched.arrayObj.size() should be (3)
+        patched.arrayObj.get(0).hasNonNull("hasIdGreaterThan10") should be (false)
+        patched.arrayObj.get(1).get("hasIdGreaterThan10").asBoolean() should be (true)
+        patched.arrayObj.get(2).get("hasIdGreaterThan10").asBoolean() should be (true)
+    }
 }
