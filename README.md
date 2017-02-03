@@ -67,6 +67,7 @@ lbmd diff --env dev -e user > patch.json # diff your local user copy against new
 ```
 
 Apply the patch in higher env:
+```
 lbmd pull --env qa -e user -v newest
 lbmd apply -e user -jp patch.json # Apply the patch locally
 lbmd diff --env qa -e user # diff your local user copy against newest user version in Lightblue, just to make sure
@@ -92,6 +93,7 @@ entity.entityInfo.hooks.forEach(function(hook) {
 
 });
 ```
+
 The remove function was added to Array.prototype for convinience. See [util.js](src/main/resources/util.js) for other embedded utilities.
 
 The logic refers to array elements by unique field values, so it will produce desired results regardless of the order.
