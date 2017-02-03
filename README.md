@@ -50,6 +50,57 @@ lbmd push --env dev -e user # Update metadata in Lightblue in dev
 lbmd push --env qa -e user # Update metadata in Lightblue in qa
 ```
 
+### Define metadata change as a patch
+
+Convenient for applying the same change to multiple environments where metadata state is unknown (other changes may be present).
+
+#### RFC 6902 JSON patch
+
+JSON patch works well for all cases which do not involve making changes to array elements. The problem with array elements is that JSON patch diff
+is refers to array indexes and will produce undesired results when elements in an array were shifted or reordered.
+
+Prepare a patch:
+```
+lbmd pull --env dev -e user -v newest # saves newest user.json version in your current directory
+vim user.json # make changes in user metadata
+lbmd diff --env dev -e user > patch.json # diff your local user copy against newest user version in Lightblue, save the diff
+```
+
+Apply the patch in higher env:
+lbmd pull --env qa -e user -v newest
+lbmd apply -e user -jp patch.json # Apply the patch locally
+lbmd diff --env qa -e user # diff your local user copy against newest user version in Lightblue, just to make sure
+lbmd push --env qa -e user # Update metadata in Lightblue in qa
+```
+
+#### JavaScript patch
+
+Considering JSON patch limitations, you can choose to describe your metadata changes in javascript.
+
+Example javascript patch:
+```javascript
+// remove "personalInformation.firstName" projection from notificationsHook
+entity.entityInfo.hooks.forEach(function(hook) {
+
+ if (hook.name != "notificationHook") {
+   return;
+ }
+
+ hook.configuration.includeProjection.remove(function(p) {
+   return p.field=="personalInformation.firstName";
+ });
+
+});
+```
+The remove function was added to Array.prototype for convinience. See [util.js](src/main/resources/util.js) for other embedded utilities.
+
+The logic refers to array elements by unique field values, so it will produce desired results regardless of the order.
+
+To apply javascript patch to your local copy:
+```
+lbmd apply -e user -jsp patch.js
+```
+
 ### Merge metadata
 
 Say you want to promote metadata from stage to prod, including entityInfo, but you want to make sure you don't change any indexes in prod.
