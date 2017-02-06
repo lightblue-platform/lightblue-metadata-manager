@@ -32,7 +32,7 @@
 		<dependency>
 			<groupId>com.redhat.lightblue.client</groupId>
 			<artifactId>lightblue-client-http</artifactId>
-			<version>5.7.0-SNAPSHOT</version>
+			<version>5.7.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.module</groupId>
