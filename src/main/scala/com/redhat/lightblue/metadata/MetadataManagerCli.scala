@@ -265,7 +265,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             }
             case "apply" => {
 
-                if (cmd.hasOption("jsp") ^ cmd.hasOption("jp")) {
+                if (cmd.hasOption("jsp") && cmd.hasOption("jp") || !cmd.hasOption("jsp") && !cmd.hasOption("jp")) {
                     throw new MissingArgumentException("Either -jp <json patch> or -jsp <javascript> is required")
                 }
 
