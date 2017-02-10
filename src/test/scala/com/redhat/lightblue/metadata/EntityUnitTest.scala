@@ -382,7 +382,7 @@ val jsonDiff = """[ {
 
         val e3 = new Entity(entity3)
 
-        val patched = e3 apply s"""
+        val patched = e3 apply """
           entity.schema.arrayObj.remove(function(el, i) {
               return el.id > 10;
           });
@@ -392,11 +392,11 @@ val jsonDiff = """[ {
         patched.arrayObj.get(0).get("id").asInt() should be (10)
     }
 
-    "entity.apply(javascript)" should "allow to modify array element by arbitrary criteria" in {
+    it should "allow to modify array element by arbitrary criteria" in {
 
         val e3 = new Entity(entity3)
 
-        val patched = e3 apply s"""
+        val patched = e3 apply """
           entity.schema.arrayObj.modify(function(el) {
               return el.id > 10;
           },
@@ -411,4 +411,22 @@ val jsonDiff = """[ {
         patched.arrayObj.get(1).get("hasIdGreaterThan10").asBoolean() should be (true)
         patched.arrayObj.get(2).get("hasIdGreaterThan10").asBoolean() should be (true)
     }
+
+    it should "support multi-line strings using `<multiline string>` notation from template literals" in {
+        val e3 = new Entity(entity3)
+
+        val patched = e3 apply """
+          entity.schema.arrayObj.push(JSON.parse(`
+            {
+                "field": "value",
+                "field1": "value1 \"double quotes\", 'single quotes'"
+            }
+	      `));
+		"""
+
+        patched.arrayObj.size() should be(4)
+        patched.arrayObj.get(3).get("field").asText() should be ("value")
+    }
+
+
 }

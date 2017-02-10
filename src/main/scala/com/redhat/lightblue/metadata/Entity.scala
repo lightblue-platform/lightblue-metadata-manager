@@ -323,19 +323,40 @@ object Entity {
 
     def processWithJavascript(node: JsonNode, javascriptCode: String) = {
 
-        val jsonNodeStr = toString(node)
-            .replaceAll("'", """\\'""")
-            .replaceAll("""\\"""", """\\\\"""") // TODO: why multiple backslashes?
+        val jsonNodeStr = fixQuotesInJS(toString(node))
 
-        val result = engine.eval(s"""
+        val codeToRun = s"""
           var entity = JSON.parse('$jsonNodeStr');
 
-          $javascriptCode
+          ${handleMultilineStringsInJS(javascriptCode)}
 
           JSON.stringify(entity);
-          """)
+          """
+
+        logger.debug(s"""executing js:\n$codeToRun""")
+
+        val result = engine.eval(codeToRun)
 
         parseJson(result.toString())
     }
+
+    def handleMultilineStringsInJS(javascriptCode: String) = {
+        val out = new StringBuffer();
+
+        for ((block, i) <- javascriptCode.split("`").zipWithIndex) {
+            if ( i % 2 == 1) {
+                // deal with multiline json
+                out.append("'")
+                out.append(fixQuotesInJS(block.replaceAll("""\s*\n\s*""", "")))
+                out.append("'")
+            } else {
+                out.append(block);
+            }
+        }
+
+        out.toString()
+    }
+
+    def fixQuotesInJS(jsString: String) = jsString.replaceAll("'", """\\'""").replaceAll("""\\"""", """\\\\"""")
 
 }
