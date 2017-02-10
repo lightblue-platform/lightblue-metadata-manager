@@ -428,5 +428,26 @@ val jsonDiff = """[ {
         patched.arrayObj.get(3).get("field").asText() should be ("value")
     }
 
+    it should "be idempotent" in {
+        val e3 = new Entity(entity3)
+
+        val patch = """
+          if (!entity.schema.arrayObj.findFirst(function(e) { return e.hasOwnProperty("field1") })) {
+              entity.schema.arrayObj.push(JSON.parse(`
+                {
+                    "field": "value",
+                    "field1": "value1 \"double quotes\", 'single quotes'"
+                }
+	      `));
+	   };
+		"""
+
+        // apply twice
+        val patched = e3 apply patch apply patch
+
+        // but it's applied once
+        patched.arrayObj.size() should be(4)
+    }
+
 
 }
