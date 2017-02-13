@@ -416,12 +416,12 @@ val jsonDiff = """[ {
         val e3 = new Entity(entity3)
 
         val patched = e3 apply """
-          entity.schema.arrayObj.push(JSON.parse(`
+          entity.schema.arrayObj.push(
             {
                 "field": "value",
                 "field1": "value1 \"double quotes\", 'single quotes'"
             }
-	      `));
+          );
 		"""
 
         patched.arrayObj.size() should be(4)
@@ -433,13 +433,13 @@ val jsonDiff = """[ {
 
         val patch = """
           if (!entity.schema.arrayObj.findFirst(function(e) { return e.hasOwnProperty("field1") })) {
-              entity.schema.arrayObj.push(JSON.parse(`
+              entity.schema.arrayObj.push(
                 {
                     "field": "value",
                     "field1": "value1 \"double quotes\", 'single quotes'"
                 }
-	      `));
-	   };
+	          );
+	      };
 		"""
 
         // apply twice

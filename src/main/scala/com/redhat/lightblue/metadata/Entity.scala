@@ -323,12 +323,12 @@ object Entity {
 
     def processWithJavascript(node: JsonNode, javascriptCode: String) = {
 
-        val jsonNodeStr = fixQuotesInJS(toString(node))
+        val jsonNodeStr = toString(node)
 
         val codeToRun = s"""
-          var entity = JSON.parse('$jsonNodeStr');
+          var entity = $jsonNodeStr;
 
-          ${handleMultilineStringsInJS(javascriptCode)}
+          $javascriptCode
 
           JSON.stringify(entity);
           """
@@ -339,24 +339,5 @@ object Entity {
 
         parseJson(result.toString())
     }
-
-    def handleMultilineStringsInJS(javascriptCode: String) = {
-        val out = new StringBuffer();
-
-        for ((block, i) <- javascriptCode.split("`").zipWithIndex) {
-            if ( i % 2 == 1) {
-                // deal with multiline json
-                out.append("'")
-                out.append(fixQuotesInJS(block.replaceAll("""\s*\n\s*""", "")))
-                out.append("'")
-            } else {
-                out.append(block);
-            }
-        }
-
-        out.toString()
-    }
-
-    def fixQuotesInJS(jsString: String) = jsString.replaceAll("'", """\\'""").replaceAll("""\\"""", """\\\\"""")
 
 }
