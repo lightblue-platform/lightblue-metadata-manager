@@ -125,6 +125,12 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .desc("A file containing entity modification logic in javascript")
             .hasArg()
             .build()
+            
+        val stdoutOption = Option.builder("c")
+            .required(false)
+            .longOpt("stdout")
+            .desc("Send resuls to stdout. Will work only if you pull a single entity.")
+            .build()
 
         // options which apply to any operation
         options.addOption(helpOption)
@@ -148,6 +154,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                 options.addOption(entityOption)
                 options.addOption(versionOption)
                 options.addOption(pathOption)
+                options.addOption(stdoutOption)
             }
             case "push" => {
                 options.addOption(lbClientOption)
@@ -239,12 +246,21 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                         val updatedLocalEntity = localEntity.replacePath(path, remoteEntity)
 
-                        println(s"""Saving $path to ${updatedLocalEntity.name}.json...""")
-                        Files.write(Paths.get(s"""${updatedLocalEntity.name}.json"""), updatedLocalEntity.text.getBytes)
+                        if (remoteEntities.size == 1 && cmd.hasOption("c")) {
+                            println(updatedLocalEntity.text)
+                        } else {
+                            logger.info(s"""Saving $path to ${updatedLocalEntity.name}.json...""")
+                            Files.write(Paths.get(s"""${updatedLocalEntity.name}.json"""), updatedLocalEntity.text.getBytes)
+                        }
                     } else {
                         // download metadata from Lightblue and save it locally
-                        println(s"""Saving ${remoteEntity}...""")
-                        Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
+                        if (remoteEntities.size == 1 && cmd.hasOption("c")) {
+                            println(remoteEntity.text)
+                        } else {
+                            // TODO: should be logger.info, but that breaks the integration test
+                            println(s"""Saving ${remoteEntity}...""")
+                            Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
+                        }
                     }
                 }
             }
