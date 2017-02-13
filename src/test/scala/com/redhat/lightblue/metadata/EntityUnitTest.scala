@@ -8,6 +8,9 @@ import com.redhat.lightblue.metadata.Entity._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.ArrayNode
+import scala.io.Source
+import junit.framework.Assert
 
 /**
  * Unit tests in ScalaTest using FlatSpec style.
@@ -137,24 +140,6 @@ class EntityUnitTest extends FlatSpec with Matchers {
          }
     }
 
-    "entity.compare" should "list no deltas for equal entities" in {
-        val e1 = new Entity(jsonStr)
-        val e2 = new Entity(jsonStr)
-
-        e1.compare(e2).size should be (0)
-    }
-
-    it should "list deltas for differences" in {
-        val e1 = new Entity(jsonStr)
-        val e2 = new Entity(jsonStr)
-
-        val n = mapper.createObjectNode()
-
-        e2.schemaJson.asInstanceOf[ObjectNode].put("newfield", "value")
-
-        e1.compare(e2).size should be (1)
-    }
-
     val entityVersionStr = """{
 	"schema": {
 		"version": {
@@ -188,5 +173,281 @@ class EntityUnitTest extends FlatSpec with Matchers {
         e2.schemaJson.has("field") should be (true)
         e1.schemaJson.get("version").has("changelog") should be (false)
     }
+
+    val entity1 = """{
+	"schema": {
+		"version": {
+			"value": "0.0.1-SNAPSHOT"
+		},
+		"arrayInt": [1, 2, 3, 4],
+		"arrayObj": [{
+		    "id": 10,
+			"a": "b",
+			"c": "d"
+		}, {
+		    "id": 20,
+			"e": "f",
+			"g": "h"
+		}],
+		"field": {
+			"foo": "bar"
+		}
+	},
+	"entityInfo": {
+		"defaultVersion": "0.0.1-SNAPSHOT",
+		"name": "entity"
+	}
+}"""
+
+    val entity2 = """{
+	"schema": {
+		"version": {
+			"value": "0.0.1-SNAPSHOT"
+		},
+		"arrayInt": [1, 2, 3, 4, 5, 6],
+		"arrayObj": [{
+		    "id": 10,
+			"a": "b",
+			"c": "d"
+		},
+		{
+		    "id": 15,
+			"1": "2",
+			"3": "4"
+		},
+		{
+		    "id": 20,
+			"e": "f",
+			"g": "h"
+		}],
+		"field": {
+			"foo": "bar"
+		}
+	},
+	"entityInfo": {
+		"defaultVersion": "0.0.1-SNAPSHOT",
+		"name": "entity"
+	}
+}"""
+
+    val entity3 = """{
+	"schema": {
+		"version": {
+			"value": "0.0.1-SNAPSHOT"
+		},
+		"arrayInt": [1, 2, 3, 4],
+		"arrayObj": [{
+		    "id": 10,
+			"a": "b",
+			"c": "d"
+		}, {
+		    "id": 20,
+			"e": "f",
+			"g": "h"
+		},
+		{
+		    "id": 30,
+			"new": "val",
+			"val": "new"
+		}],
+		"field": {
+			"foo": "bar"
+		}
+	},
+	"entityInfo": {
+		"defaultVersion": "0.0.1-SNAPSHOT",
+		"name": "entity",
+		"changelog": "'Single quote', \"double quote\""
+	}
+}"""
+
+val jsonDiff = """[ {
+  "op" : "replace",
+  "path" : "/schema/version/value",
+  "value" : "0.0.1"
+}, {
+  "op" : "replace",
+  "path" : "/entityInfo/defaultVersion",
+  "value" : "0.0.1"
+} ]"""
+
+    "entity.diff" should "create a diff" in {
+        val e1 = new Entity(entity1)
+        val e2 = e1.version("0.0.1")
+
+        val diff = e1 diff e2
+
+        // TODO: use implicit
+        toFormatedString(diff) should be (jsonDiff)
+    }
+
+    it should "create an empty array diff for equal entities" in {
+        val e1 = new Entity(entity1)
+        val e2 = new Entity(e1)
+
+        val diff = e1 diff e2
+
+        toFormatedString(diff) should be ("[ ]")
+    }
+
+    it should "not rewrite entire array if the first element is removed" in {
+        val e2 = new Entity(entity2)
+        val e22 = new Entity(e2)
+
+        e22.json.get("schema").get("arrayObj").asInstanceOf[ArrayNode].remove(0)
+
+        val diff = e2 diff e22
+
+        diff.asInstanceOf[ArrayNode].size() should be (1)
+    }
+
+    it should "not rewrite entire array if the first element is changed" in {
+        val e2 = new Entity(entity2)
+        val e22 = new Entity(e2)
+
+        e22.json.get("schema").get("arrayObj").asInstanceOf[ArrayNode].get(0).asInstanceOf[ObjectNode].remove("a")
+
+        val diff = e2 diff e22
+
+        diff.asInstanceOf[ArrayNode].size() should be (1)
+    }
+
+    "entity.apply(JsonPatch)" should "apply a replace patch to source" in {
+
+        val e1 = new Entity(entity1)
+        val e2 = e1.version("0.0.1")
+
+        val patch = mapper.readTree(jsonDiff).asInstanceOf[ArrayNode]
+
+        val patched = e1.apply(patch)
+
+        patched should be (e2)
+    }
+
+    it should "apply a replace patch to a different source" in {
+
+        val e1 = new Entity(entity2)
+        val e2 = e1.version("0.0.1")
+
+        val patch = mapper.readTree(jsonDiff).asInstanceOf[ArrayNode]
+
+        val patched = e1.apply(patch)
+
+        patched should be (e2)
+    }
+
+    it should "apply an add patch to source" in {
+
+        val e1 = new Entity(entity1)
+        val e2 = new Entity(entity2)
+
+        val patch = e1 diff e2
+
+        val patched = e1.apply(patch)
+
+        patched should be (e2)
+    }
+
+    implicit class TestEntityHelper(e: Entity) {
+        def arrayObj = e.json.get("schema").get("arrayObj").asInstanceOf[ArrayNode]
+        def arrayInt = e.json.get("schema").get("arrayInt").asInstanceOf[ArrayNode]
+    }
+
+    it should "be able to merge a sequance of patches" in {
+
+        val e1 = new Entity(entity1)
+        val e2 = new Entity(entity2)
+        val e3 = new Entity(entity3)
+
+        val patch12 = e1 diff e2
+        val patch23 = e1 diff e3
+
+        val patched = e1.apply(patch12).apply(patch23)
+
+        patched.arrayInt.size() should be (6)
+        patched.arrayObj.size() should be (4)
+
+        patched.arrayObj.get(0).get("id").asInt() should be (10)
+        patched.arrayObj.get(1).get("id").asInt() should be (15)
+        // changed the order, but inserted all elements
+        patched.arrayObj.get(2).get("id").asInt() should be (30)
+        patched.arrayObj.get(3).get("id").asInt() should be (20)
+    }
+
+    // json patch operates on array indexes, making modify and remove operations unpredictable
+    // to make sure your patch delivers expected changes regardless of target entity state,
+    // prepare a javascript patch:
+
+    "entity.apply(javascript)" should "allow to remove array element by arbitrary criteria" in {
+
+        val e3 = new Entity(entity3)
+
+        val patched = e3 apply """
+          entity.schema.arrayObj.remove(function(el, i) {
+              return el.id > 10;
+          });
+        """
+
+        patched.arrayObj.size() should be (1)
+        patched.arrayObj.get(0).get("id").asInt() should be (10)
+    }
+
+    it should "allow to modify array element by arbitrary criteria" in {
+
+        val e3 = new Entity(entity3)
+
+        val patched = e3 apply """
+          entity.schema.arrayObj.modify(function(el) {
+              return el.id > 10;
+          },
+          function(el) {
+              el.hasIdGreaterThan10 = true;
+              return el;
+          });
+        """
+
+        patched.arrayObj.size() should be (3)
+        patched.arrayObj.get(0).hasNonNull("hasIdGreaterThan10") should be (false)
+        patched.arrayObj.get(1).get("hasIdGreaterThan10").asBoolean() should be (true)
+        patched.arrayObj.get(2).get("hasIdGreaterThan10").asBoolean() should be (true)
+    }
+
+    it should "support multi-line strings using `<multiline string>` notation from template literals" in {
+        val e3 = new Entity(entity3)
+
+        val patched = e3 apply """
+          entity.schema.arrayObj.push(
+            {
+                "field": "value",
+                "field1": "value1 \"double quotes\", 'single quotes'"
+            }
+          );
+		"""
+
+        patched.arrayObj.size() should be(4)
+        patched.arrayObj.get(3).get("field").asText() should be ("value")
+    }
+
+    it should "be idempotent" in {
+        val e3 = new Entity(entity3)
+
+        val patch = """
+          if (!entity.schema.arrayObj.findFirst(function(e) { return e.hasOwnProperty("field1") })) {
+              entity.schema.arrayObj.push(
+                {
+                    "field": "value",
+                    "field1": "value1 \"double quotes\", 'single quotes'"
+                }
+	          );
+	      };
+		"""
+
+        // apply twice
+        val patched = e3 apply patch apply patch
+
+        // but it's applied once
+        patched.arrayObj.size() should be(4)
+    }
+
 
 }

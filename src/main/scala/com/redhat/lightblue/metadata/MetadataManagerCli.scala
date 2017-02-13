@@ -55,11 +55,19 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .build();
 
         val entityOption = Option.builder("e")
-            .required(false)
+            .required(true)
             .longOpt("entity")
             .desc("Entity name. You can use regular expression to match multiple entities by name. You can use $local to match all entities in current local directory).")
             .hasArg()
             .argName("entity name or /regex/ or $local")
+            .build();
+
+        val singleEntityOption = Option.builder("e")
+            .required(true)
+            .longOpt("entity")
+            .desc("Entity name.")
+            .hasArg()
+            .argName("entity name")
             .build();
 
         val versionOption = Option.builder("v")
@@ -104,6 +112,20 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .hasArg()
             .build()
 
+        val jsonPatchOption = Option.builder("jp")
+            .required(false)
+            .longOpt("json-patch")
+            .desc("A file containing RFC 6902 JSON patch")
+            .hasArg()
+            .build()
+
+        val jsPatchOption = Option.builder("jsp")
+            .required(false)
+            .longOpt("js-patch")
+            .desc("A file containing entity modification logic in javascript")
+            .hasArg()
+            .build()
+            
         val stdoutOption = Option.builder("c")
             .required(false)
             .longOpt("stdout")
@@ -144,12 +166,17 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             case "diff" => {
                 options.addOption(lbClientOption)
                 options.addOption(envOption)
-                options.addOption(entityOption)
+                options.addOption(singleEntityOption)
             }
             case "set" => {
-                options.addOption(entityOption)
+                options.addOption(singleEntityOption)
                 options.addOption(setVersionsOption)
                 options.addOption(setChangelogOption)
+            }
+            case "apply" => {
+                options.addOption(singleEntityOption)
+                options.addOption(jsonPatchOption)
+                options.addOption(jsPatchOption)
             }
             case _ => ;
         }
@@ -164,7 +191,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             System.exit(0);
         }
 
-        if (!List("push", "pull", "diff", "list", "set").contains(operation)) {
+        if (!List("push", "pull", "diff", "list", "set", "apply").contains(operation)) {
             throw new ParseException(s"""Unsupported operation $operation""")
         }
 
@@ -247,9 +274,50 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     source.mkString
                 }
 
-                var entity = new Entity(metadata)
+                val entity = new Entity(metadata)
 
                 createMetadataManager().diffEntity(entity)
+            }
+            case "apply" => {
+
+                if (cmd.hasOption("jsp") && cmd.hasOption("jp") || !cmd.hasOption("jsp") && !cmd.hasOption("jp")) {
+                    throw new MissingArgumentException("Either -jp <json patch> or -jsp <javascript> is required")
+                }
+
+                val entityName = cmd.getOptionValue("e")
+
+                val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
+                    source.mkString
+                }
+
+                val entity = new Entity(metadata)
+
+                val patchedEntity = if (cmd.hasOption("jp")) {
+                    // json patch
+
+                    val patchPath = cmd.getOptionValue("jp")
+
+                    val patchStr = using(Source.fromFile(patchPath)) { source =>
+                        source.mkString
+                    }
+
+                    entity.apply(Entity.mapper.readTree(patchStr))
+                } else {
+                    // javascript
+
+                    val patchPath = cmd.getOptionValue("jsp")
+
+                    val patchStr = using(Source.fromFile(patchPath)) { source =>
+                        source.mkString
+                    }
+
+                    entity.apply(patchStr)
+                }
+
+                Files.write(Paths.get(s"""${entityName}.json"""), patchedEntity.text.getBytes)
+
+                logger.info(s"""Patched $patchedEntity""")
+
             }
             case "push" => {
                 if (!cmd.hasOption("e")) {
@@ -331,7 +399,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     def printUsage(options: Options) {
         val formatter = new HelpFormatter();
         formatter.printHelp(180, MetadataManagerApp.getClass.getSimpleName + " <operation> <options>",
-            "\nAvailable operations: list, pull, push, diff and set. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
+            "\nAvailable operations: list, pull, push, diff, apply and set. Add -h after operation to see options it accepts.\n\nOptions:", options, null)
 
     }
 
