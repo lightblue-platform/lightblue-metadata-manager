@@ -1,22 +1,32 @@
 package com.redhat.lightblue.metadata
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import jiff.JsonDelta
-import com.fasterxml.jackson.databind.node.TextNode
-import com.fasterxml.jackson.core.util.DefaultIndenter
-import jiff.JsonDiff
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.databind.SerializationFeature
+import scala.collection.JavaConversions.asScalaIterator
+import scala.io.Source
+
 import org.slf4j.LoggerFactory
 
-import com.redhat.lightblue.metadata.Entity._
-import scala.collection.JavaConversions._
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.core.util.DefaultIndenter
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.TextNode
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import com.flipkart.zjsonpatch.JsonDiff
+import com.flipkart.zjsonpatch.JsonPatch
+import com.redhat.lightblue.metadata.Entity.getPath
+import com.redhat.lightblue.metadata.Entity.logger
+import com.redhat.lightblue.metadata.Entity.mapper
+import com.redhat.lightblue.metadata.Entity.parseJson
+import com.redhat.lightblue.metadata.Entity.processWithJavascript
+import com.redhat.lightblue.metadata.Entity.putPath
+import com.redhat.lightblue.metadata.Entity.toSortedFormatedString
 import com.redhat.lightblue.metadata.util.JavaUtil
+
+import javax.script.ScriptEngineManager
 
 /*
  * Represents entity versions, as returned by /rest/metadata/{entity}/
@@ -34,6 +44,8 @@ class Entity(rootNode: ObjectNode) {
 
     def this(jsonStr: String) = this(parseJson(jsonStr))
 
+    def this(e: Entity) = this(e.json.asInstanceOf[ObjectNode].deepCopy())
+
     rootNode.get("schema").asInstanceOf[ObjectNode].remove("_id")
     rootNode.get("entityInfo").asInstanceOf[ObjectNode].remove("_id")
 
@@ -47,14 +59,14 @@ class Entity(rootNode: ObjectNode) {
 
     def version: String = schemaJson.get("version").get("value").asText()
 
-    def text: String = toSortedString(json)
+    def text: String = toSortedFormatedString(json)
 
-    def entityInfoText = toSortedString(entityInfoJson)
+    def entityInfoText = toSortedFormatedString(entityInfoJson)
 
-    def schemaText = toSortedString(schemaJson)
+    def schemaText = toSortedFormatedString(schemaJson)
 
     // set all arrays in entityInfo.access to ["anyone"]
-    def accessAnyone: Entity = {
+    def accessAnyone(): Entity = {
 
         modifyCopy {
             (rootNode) => {
@@ -78,10 +90,6 @@ class Entity(rootNode: ObjectNode) {
                 putPath(rootNode, getPath(replaceFrom.json, path), path)
             }
         }
-    }
-
-    def compare(other: Entity): List[JsonDelta] = {
-        diff.computeDiff(json, other.json).toList
     }
 
     def changelog(message: String): Entity = {
@@ -108,6 +116,32 @@ class Entity(rootNode: ObjectNode) {
         }
     }
 
+    /**
+     * Create a diff (RFC 6902 JSON patch).
+     *
+     */
+    def diff(other: Entity) = JsonDiff.asJson(json, other.json)
+
+    /**
+     * Apply RFC 6902 JSON patch.
+     *
+     */
+    def apply(patch: JsonNode): Entity = {
+        logger.debug(s"""Patching with $patch""")
+
+        new Entity(JsonPatch.apply(patch, rootNode).asInstanceOf[ObjectNode])
+    }
+
+    /**
+     * Apply javascript logic.
+     *
+     */
+    def apply(javascriptCode: String): Entity = {
+       logger.debug(s"""Processing with $javascriptCode""")
+
+       new Entity(processWithJavascript(rootNode, javascriptCode))
+    }
+
     // control structure to operate on a ObjectNode copy and return new Entity
     private def modifyCopy(modifyLogic: (ObjectNode) => Unit)(implicit rootNode: ObjectNode): Entity = {
         val copy = rootNode.deepCopy()
@@ -116,6 +150,15 @@ class Entity(rootNode: ObjectNode) {
     }
 
     override def toString = s"""$name|$version"""
+
+    override def equals(e: Any): Boolean = {
+
+        e match {
+            case that: Entity => this.json.equals(that.json)
+            case _ => false
+        }
+
+    }
 }
 
 object MetadataScope extends Enumeration {
@@ -146,10 +189,10 @@ object Entity {
     prettyPrinter.indentObjectsWith(indenter);
     prettyPrinter.indentArraysWith(indenter);
 
-    // diff provider
-    val diff = new jiff.JsonDiff()
-    diff.setOption(JsonDiff.Option.ARRAY_ORDER_INSIGNIFICANT);
-    diff.setOption(JsonDiff.Option.RETURN_LEAVES_ONLY);
+    // javascript engine
+    val util_js = Source.fromInputStream(getClass.getResourceAsStream("/util.js")).mkString
+    val engine = new ScriptEngineManager().getEngineByMimeType("text/javascript")
+    engine.eval(util_js)
 
     // entity version selectors
     def entityVersionDefault = (l: List[EntityVersion]) => l collectFirst { case v if v.defaultVersion => v }
@@ -221,8 +264,8 @@ object Entity {
      * TODO: I don't see a way to key-sort JsonNode
      * instead doing following conversions: JsonNode -> String -> Map -> String sorted by keys
      */
-    def toSortedString(json: JsonNode): String = {
-        val jsonStr = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json)
+    def toSortedFormatedString(json: JsonNode): String = {
+        val jsonStr = toFormatedString(json)
 
         // jackson-module-scala handles conversion from json to scala map well
         val map = mapper.readValue[Map[String, Any]](jsonStr)
@@ -231,6 +274,10 @@ object Entity {
         // have to convert scala map to java map first
         mapper.writer(prettyPrinter).writeValueAsString(JavaUtil.toJava(map))
     }
+
+    def toFormatedString(json: JsonNode) = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json)
+
+    def toString(json: JsonNode) = mapper.writeValueAsString(json)
 
     def parseJson(json: String): ObjectNode = {
         mapper.readTree(json).asInstanceOf[ObjectNode]
@@ -272,6 +319,25 @@ object Entity {
             case true => putPath(node.get(nextField), nodePut, remainingPath)
             case false => throw new MetadataManagerException(s"""nextField not found!""")
         }
+    }
+
+    def processWithJavascript(node: JsonNode, javascriptCode: String) = {
+
+        val jsonNodeStr = toString(node)
+
+        val codeToRun = s"""
+          var entity = $jsonNodeStr;
+
+          $javascriptCode
+
+          JSON.stringify(entity);
+          """
+
+        logger.debug(s"""executing js:\n$codeToRun""")
+
+        val result = engine.eval(codeToRun)
+
+        parseJson(result.toString())
     }
 
 }

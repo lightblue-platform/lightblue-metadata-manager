@@ -40,9 +40,9 @@
 			<version>2.7.4</version>
 		</dependency>
 		<dependency>
-			<groupId>com.redhat.lightblue.migrator</groupId>
-			<artifactId>jiff</artifactId>
-			<version>2.50.0</version>
+			<groupId>com.flipkart.zjsonpatch</groupId>
+			<artifactId>zjsonpatch</artifactId>
+			<version>0.2.4</version>
 		</dependency>
 
 		<dependency>

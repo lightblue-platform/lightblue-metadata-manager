@@ -27,9 +27,7 @@ import com.redhat.lightblue.client.response.LightblueMetadataResponse
 import com.redhat.lightblue.client.request.metadata.MetadataCreateSchemaRequest
 import java.util.regex.Pattern
 import scala.util.matching.Regex
-import jiff.JsonDiff
 import scala.collection.JavaConversions._
-import jiff.JsonDelta
 import com.fasterxml.jackson.databind.node.TextNode
 
 import com.redhat.lightblue.metadata.Entity._;
@@ -118,16 +116,10 @@ class MetadataManager(val client: LightblueClient) {
             case None => throw new Exception(s"""${entity.name} does not exist in this environment""")
         }
 
-        val deltas = entity.compare(remoteEntity)
+        val diff = remoteEntity diff entity
 
-        if (!deltas.isEmpty) {
-            logger.info("Diff format: <field>(<local value> != <remote value>)")
-            logger.info("")
-
-            deltas foreach { delta => logger.info(delta.toString()); logger.info("") }
-        }
+        println(toFormatedString(diff))
     }
-
 
     def putEntity(entity: Entity, scope: MetadataScope.Value) {
         logger.debug(s"""Uploading $entity scope=$scope""")
