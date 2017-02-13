@@ -257,7 +257,8 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                         if (remoteEntities.size == 1 && cmd.hasOption("c")) {
                             println(remoteEntity.text)
                         } else {
-                            logger.info(s"""Saving ${remoteEntity}...""")
+                            // TODO: should be logger.info, but that breaks the integration test
+                            println(s"""Saving ${remoteEntity}...""")
                             Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
                         }
                     }
