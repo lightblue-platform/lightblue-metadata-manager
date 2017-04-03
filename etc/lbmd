@@ -1,3 +1,8 @@
 #!/bin/bash
 
 java -jar $(find /usr/share/lightblue-metadata-manager -name lightblue-metadata-manager*jar-with-dependencies.jar) "$@"
+
+# Execute a command after each lbmd operation, useful for formatting metadata using python -mjson.tool
+if [ -n "$LBMD_POST_HOOK" ]; then
+    sh $LBMD_POST_HOOK
+fi
