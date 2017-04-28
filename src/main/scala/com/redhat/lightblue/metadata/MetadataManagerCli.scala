@@ -18,15 +18,17 @@ import com.redhat.lightblue.client.LightblueClient
 import com.redhat.lightblue.client.http.LightblueHttpClient
 import com.redhat.lightblue.metadata.util.Control.using
 import com.redhat.lightblue.metadata.util.OptionUtils._
+import com.redhat.lightblue.metadata.util.IOUtils
+import com.redhat.lightblue.metadata.util.IOUtilsImpl
 
 /**
  * Command Line Interface for {@link MetadataManager}.
  *
  */
-class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueClient]) {
+class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager], ioUtils: IOUtils) {
 
-    def this(args: Array[String]) = this(args, None)
-    def this(args: String, client: LightblueClient) = this(args.split(" "), Some(client))
+    def this(args: Array[String]) = this(args, None, new IOUtilsImpl)
+    def this(args: String, client: LightblueClient) = this(args.split(" "), Some(new MetadataManager(client)), new IOUtilsImpl)
 
     val logger = LoggerFactory.getLogger(MetadataManagerApp.getClass);
 
@@ -97,14 +99,9 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
         }
 
         // initialize Lightblue client
-        // use explicitly passed client if provided (for unit tests)
-        implicit val lbClient = _client match {
-            case Some(x) => {
-                logger.debug("""Lightblue client passed to cli.""")
-                Some(x)
-            }
-            case None => createClient(cmd)
-        }
+        // may be None if not provided via cli
+        implicit val _client = createClient(cmd)
+        implicit val _mdm = mdm
 
         operation match {
             case "list" => {
@@ -127,18 +124,13 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     } else {
                         // TODO: should be logger.info, but that breaks the integration test
                         println(s"""Saving ${remoteEntity}...""")
-                        Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
+
+                        ioUtils.saveEntityToFile(remoteEntity)
                     }
                 }
             }
             case "diff" => {
-                val entityName = cmd.entityName
-
-                val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
-                    source.mkString
-                }
-
-                val entity = new Entity(metadata)
+                val entity = ioUtils.readEntityFromFile(cmd.entityName)
 
                 createMetadataManager().diffEntity(entity)
             }
@@ -167,16 +159,12 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                     }
                 }
 
-                Files.write(Paths.get(s"""${cmd.entityName}.json"""), patchedEntity.text.getBytes)
+                ioUtils.saveEntityToFile(patchedEntity)
 
                 logger.info(s"""Patched $patchedEntity""")
 
             }
             case "push" => {
-                if (cmd.hasOption("eio") && cmd.hasOption("so")) {
-                    throw new ParseException("You need to provide either --entityInfoOnly or --schemaOnly switches, not both")
-                }
-
                 val entityNameValue = cmd.entityName
 
                 // -e $local means that all local files are to be pulled
@@ -188,11 +176,7 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
                 for (entityName <- entityNames) {
 
-                    val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
-                        source.mkString
-                    }
-
-                    var entity = new Entity(metadata)
+                    var entity = ioUtils.readEntityFromFile(entityName)
 
                     logger.debug(s"""Loaded $entity from local file""")
 
@@ -201,25 +185,20 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
             }
             case "set" => {
-                val entityName = cmd.entityName
 
-                val metadata = using(Source.fromFile(s"""$entityName.json""")) { source =>
-                    source.mkString
-                }
-
-                var entity = new Entity(metadata)
+                var entity = ioUtils.readEntityFromFile(cmd.entityName)
 
                 cmd.versions match {
                     case Some(vs) => entity = entity.version(vs)
-                    case None => ;
+                    case None     => ;
                 }
 
                 cmd.changelog match {
                     case Some(cl) => entity = entity.version(cl)
-                    case None => ;
+                    case None     => ;
                 }
 
-                Files.write(Paths.get(s"""${entityName}.json"""), entity.text.getBytes)
+                ioUtils.saveEntityToFile(entity)
             }
             case other => throw new UnsupportedOperationException(s"""Unknown operation $other""")
         }
@@ -244,14 +223,6 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
 
     }
 
-    def parseVersion(version: String): List[EntityVersion] => scala.Option[EntityVersion] = {
-        version match {
-            case "default" => Entity.entityVersionDefault
-            case "newest"  => Entity.entityVersionNewest
-            case x         => Entity.entityVersionExplicit(x)
-        }
-    }
-
     /**
      * Initialize Lightblue client from cli.
      *
@@ -270,12 +241,15 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
     }
 
     /**
-     * create metadata manager
+     * Create metadata manager.
      */
-    def createMetadataManager()(implicit client: scala.Option[LightblueClient]): MetadataManager = {
-        client match {
-            case None    => throw new Exception("Lightblue client is needed to create MetadataManager!")
-            case Some(x) => new MetadataManager(x)
+    def createMetadataManager()(implicit client: scala.Option[LightblueClient], mdm: scala.Option[MetadataManager]): MetadataManager = {
+        mdm match {
+            case Some(x) => x
+            case None => client match {
+                case None    => throw new Exception("Lightblue client is needed to create MetadataManager!")
+                case Some(x) => new MetadataManager(x)
+            }
         }
     }
 
