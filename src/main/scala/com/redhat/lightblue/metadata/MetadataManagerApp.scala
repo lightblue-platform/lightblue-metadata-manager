@@ -1,7 +1,7 @@
 package com.redhat.lightblue.metadata
 
 /**
- * Appplication's entry point.
+ * Application's entry point.
  *
  */
 object MetadataManagerApp {
