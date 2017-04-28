@@ -29,6 +29,7 @@ class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager]
 
     def this(args: Array[String]) = this(args, None, new IOUtilsImpl)
     def this(args: String, client: LightblueClient) = this(args.split(" "), Some(new MetadataManager(client)), new IOUtilsImpl)
+    def this(args: String, mdm: MetadataManager, ioUtils: IOUtils) = this(args.split(" "), Some(mdm), ioUtils)
 
     val logger = LoggerFactory.getLogger(MetadataManagerApp.getClass);
 
@@ -119,7 +120,7 @@ class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager]
 
                 remoteEntities foreach { remoteEntity =>
                     // download metadata from Lightblue and save it locally
-                    if (remoteEntities.size == 1 && cmd.hasOption("c")) {
+                    if (remoteEntities.size == 1 && cmd.isStdout) {
                         println(remoteEntity.text)
                     } else {
                         // TODO: should be logger.info, but that breaks the integration test

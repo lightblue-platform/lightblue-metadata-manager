@@ -36,10 +36,11 @@ object OptionUtils {
         .hasArg()
         .argName("entity name or /regex/ or $local")
         .build();
+
     val singleEntityOption = Option.builder("e")
         .required(true)
         .longOpt("entity")
-        .desc("Entity name.")
+        .desc("Entity name. One.")
         .hasArg()
         .argName("entity name")
         .build();
@@ -110,10 +111,9 @@ object OptionUtils {
 
     // implicit enrichment of apache's CommandLine
     implicit class MetadataManagerCommandLine(cmd: CommandLine) {
-        //        def hasEntity() = cmd.hasOption("e")
+
         def entityName = cmd.getOptionValue("e")
 
-        //        def hasVersion() = cmd.hasOption("v")
         def versionsSelector = if (cmd.hasOption("v")) parseVersion(cmd.getOptionValue("v")) else parseVersion("newest")
 
         def lbClientConfigFilePath = {
@@ -166,6 +166,7 @@ object OptionUtils {
 
         def versions = optionValue("vs")
 
+        def isStdout = cmd.hasOption("c")
 
         private def optionValue(opt: String): scala.Option[String] = {
             if (cmd.hasOption(opt)) {
