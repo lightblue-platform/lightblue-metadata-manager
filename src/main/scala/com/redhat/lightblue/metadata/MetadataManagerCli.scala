@@ -78,14 +78,6 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
             .argName("x.x.x|newest|default")
             .build();
 
-        val pathOption = Option.builder("p")
-            .required(false)
-            .longOpt("path")
-            .desc("Pull specified path, e.g 'entityInfo.indexes'. Leave local metadata otherwise intact.")
-            .hasArg()
-            .argName("path")
-            .build();
-
         val entityInfoOnlyOption = Option.builder("eio")
             .required(false)
             .longOpt("entityInfoOnly")
@@ -153,7 +145,6 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                 options.addOption(envOption)
                 options.addOption(entityOption)
                 options.addOption(versionOption)
-                options.addOption(pathOption)
                 options.addOption(stdoutOption)
             }
             case "push" => {
@@ -236,31 +227,13 @@ class MetadataManagerCli(args: Array[String], _client: scala.Option[LightblueCli
                 }
 
                 remoteEntities foreach { remoteEntity =>
-                    if (cmd.hasOption("p")) {
-                        // download metadata path from Lightblue and save it locally
-                        val path = cmd.getOptionValue("p")
-
-                        val localEntity = new Entity(using(Source.fromFile(s"""${remoteEntity.name}.json""")) { source =>
-                            source.mkString
-                        })
-
-                        val updatedLocalEntity = localEntity.replacePath(path, remoteEntity)
-
-                        if (remoteEntities.size == 1 && cmd.hasOption("c")) {
-                            println(updatedLocalEntity.text)
-                        } else {
-                            logger.info(s"""Saving $path to ${updatedLocalEntity.name}.json...""")
-                            Files.write(Paths.get(s"""${updatedLocalEntity.name}.json"""), updatedLocalEntity.text.getBytes)
-                        }
+                    // download metadata from Lightblue and save it locally
+                    if (remoteEntities.size == 1 && cmd.hasOption("c")) {
+                        println(remoteEntity.text)
                     } else {
-                        // download metadata from Lightblue and save it locally
-                        if (remoteEntities.size == 1 && cmd.hasOption("c")) {
-                            println(remoteEntity.text)
-                        } else {
-                            // TODO: should be logger.info, but that breaks the integration test
-                            println(s"""Saving ${remoteEntity}...""")
-                            Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
-                        }
+                        // TODO: should be logger.info, but that breaks the integration test
+                        println(s"""Saving ${remoteEntity}...""")
+                        Files.write(Paths.get(s"""${remoteEntity.name}.json"""), remoteEntity.text.getBytes)
                     }
                 }
             }

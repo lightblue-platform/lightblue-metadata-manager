@@ -103,16 +103,6 @@ To apply javascript patch to your local copy:
 lbmd apply -e user -jsp patch.js
 ```
 
-### Merge metadata
-
-Say you want to promote metadata from stage to prod, including entityInfo, but you want to make sure you don't change any indexes in prod.
-```
-lbmd pull --env stage -e user -v newest # saves newest user.json version in stage in your current directory
-lbmd pull --env prod -e user -v newest --path entityInfo.indexes # Merge entityInfo.indexes from prod into your local copy
-lbmd diff --env prod -e user # diff your local copy against prod to see what will get pushed
-lbmd push --env prod -e user # update metadata in prod
-```
-
 ### More pull examples
 ```
 lbmd pull --env dev -e user -v 0.0.2 # download user entity version 0.0.2
