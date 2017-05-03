@@ -14,6 +14,16 @@
        }
   };
 
+
+  Array.prototype.contains = function(matcher) {
+	  for(var i = this.length - 1; i >= 0; i--) {
+          if(matcher(this[i], i)) {
+             return true;
+          }
+      }
+	  return false;
+  }
+
   Array.prototype.findFirst = function (predicate, thisValue) {
       var arr = Object(this);
       if (typeof predicate !== 'function') {
