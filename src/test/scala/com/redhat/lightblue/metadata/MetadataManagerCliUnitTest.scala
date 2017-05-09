@@ -16,13 +16,15 @@ import org.scalatest.BeforeAndAfterAll
 import org.mockito.Mockito
 import com.redhat.lightblue.metadata.Entity._
 import org.mockito.ArgumentCaptor
+import org.scalatest.BeforeAndAfter
+import org.junit.After
 
 /**
  * Test cli with an exception of Lightblue client initialization (so no env required).
  *
  */
 @RunWith(classOf[JUnitRunner])
-class MetadataManagerCliUnitTest extends FlatSpec with BeforeAndAfterAll with ScalaTestMatchers with MockitoSugar {
+class MetadataManagerCliUnitTest extends FlatSpec with BeforeAndAfterAll with BeforeAndAfter with ScalaTestMatchers with MockitoSugar {
 
     val fooEntityStr = """{
 	"schema": {
@@ -43,10 +45,15 @@ class MetadataManagerCliUnitTest extends FlatSpec with BeforeAndAfterAll with Sc
     var ioUtils: IOUtils = _
     var fooEntity: Entity = _
 
-    override def beforeAll() {
+    before {
         mdm = mock[MetadataManager]
         ioUtils = mock[IOUtils]
         fooEntity = new Entity(fooEntityStr)
+    }
+
+    after {
+        verifyNoMoreInteractions(mdm)
+        verifyNoMoreInteractions(ioUtils)
     }
 
     "list" should "list all entities" in {
@@ -71,6 +78,22 @@ class MetadataManagerCliUnitTest extends FlatSpec with BeforeAndAfterAll with Sc
         // verify correct version selector is used
         val versionSelectorFunction = argCaptor.getValue
         versionSelectorFunction(List(EntityVersion("1.0.0", "changelog", "inactive", false))) should be (Some(EntityVersion("1.0.0", "changelog", "inactive", false)))
+    }
+
+    """set -e foo -cl "changelog" -vs "0.0.1"""" should "set changelog and versions accordingly" in {
+        when(ioUtils.readEntityFromFile("foo")) thenReturn(fooEntity)
+
+        new MetadataManagerCli("""set -e foo -cl "changelog" -vs "0.0.1"""", mdm, ioUtils)
+
+        verify(ioUtils).readEntityFromFile("foo")
+
+        var argCaptor = ArgumentCaptor.forClass(classOf[Entity]);
+        verify(ioUtils).saveEntityToFile(argCaptor.capture())
+
+        val savedEntity = argCaptor.getValue
+        savedEntity.changelog should be ("changelog")
+        savedEntity.version should be ("0.0.1")
+        savedEntity.defaultVersion should be ("0.0.1")
     }
 
 }

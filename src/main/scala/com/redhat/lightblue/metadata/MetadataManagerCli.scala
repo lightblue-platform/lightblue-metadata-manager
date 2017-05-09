@@ -195,7 +195,7 @@ class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager]
                 }
 
                 cmd.changelog match {
-                    case Some(cl) => entity = entity.version(cl)
+                    case Some(cl) => entity = entity.changelog(cl)
                     case None     => ;
                 }
 
