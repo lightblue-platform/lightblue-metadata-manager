@@ -126,16 +126,19 @@ class MetadataManager(val client: LightblueClient) {
 
         val r = scope match {
             case MetadataScope.SCHEMA => {
+                logger.debug("Pusing schema only")
                 val r = new MetadataCreateSchemaRequest(entity.name, entity.version)
                 r.setBodyJson(entity.schemaText)
                 r
             }
             case MetadataScope.ENTITYINFO => {
+                logger.debug("Pusing entityInfo only")
                 val r = new MetadataCreateNewEntityRequest(entity.name, null)
                 r.setBodyJson(entity.entityInfoText)
                 r
             }
             case MetadataScope.BOTH => {
+                logger.debug("Pusing both schema and entityInfo")
                 val r = new MetadataCreateNewEntityRequest(entity.name, entity.version)
                 r.setBodyJson(entity.text)
                 r

@@ -102,6 +102,8 @@ class Entity(rootNode: ObjectNode) {
         }
     }
 
+    def changelog = getPath(rootNode, "schema.version.changelog").asText()
+
     def version(version: String): Entity = {
         logger.debug(s"""Setting version to $version""")
 
@@ -115,6 +117,8 @@ class Entity(rootNode: ObjectNode) {
             }
         }
     }
+
+    def defaultVersion = getPath(rootNode, "entityInfo.defaultVersion").asText()
 
     /**
      * Create a diff (RFC 6902 JSON patch).
