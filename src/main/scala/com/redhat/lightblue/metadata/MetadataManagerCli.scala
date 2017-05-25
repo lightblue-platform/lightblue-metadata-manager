@@ -88,7 +88,7 @@ class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager]
         val optionsArgs = args.slice(1, args.length)
 
         val parser = new DefaultParser()
-        val cmd = parser.parse(options, optionsArgs)
+        implicit val cmd = parser.parse(options, optionsArgs)
 
         if (cmd.isHelp) {
             printUsage(options)
@@ -98,11 +98,6 @@ class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager]
         if (!List("push", "pull", "diff", "list", "set", "apply").contains(operation)) {
             throw new ParseException(s"""Unsupported operation $operation""")
         }
-
-        // initialize Lightblue client
-        // may be None if not provided via cli
-        implicit val _client = createClient(cmd)
-        implicit val _mdm = mdm
 
         operation match {
             case "list" => {
@@ -228,29 +223,26 @@ class MetadataManagerCli(args: Array[String], mdm: scala.Option[MetadataManager]
      * Initialize Lightblue client from cli.
      *
      */
-    def createClient(cmd: CommandLine): scala.Option[LightblueClient] = {
+    def createClient(cmd: CommandLine): LightblueClient = {
 
         cmd.lbClientConfigFilePath match {
-            case None => None
+            case None => throw new Exception("Can't initialize lightblue client - no configuration provided!")
             case Some(f) => {
                 logger.debug(s"""Reading lightblue client configuration from ${f}""")
 
-                Some(new LightblueHttpClient(f))
+                new LightblueHttpClient(f)
             }
         }
 
     }
 
     /**
-     * Create metadata manager.
+     * Initialize metadata manager from cli (unless already initialized).
      */
-    def createMetadataManager()(implicit client: scala.Option[LightblueClient], mdm: scala.Option[MetadataManager]): MetadataManager = {
+    def createMetadataManager()(implicit cmd: CommandLine): MetadataManager = {
         mdm match {
             case Some(x) => x
-            case None => client match {
-                case None    => throw new Exception("Lightblue client is needed to create MetadataManager!")
-                case Some(x) => new MetadataManager(x)
-            }
+            case None => new MetadataManager(createClient(cmd))
         }
     }
 
